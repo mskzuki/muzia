@@ -20,6 +20,7 @@ abstract interface class MusicRepository {
     String? releaseInfo,
   });
   Future<void> markRemoved(String filePath, bool removed);
+  Future<void> markRemovedMany(List<String> filePaths, bool removed);
 }
 
 class InMemoryMusicRepository implements MusicRepository {
@@ -65,9 +66,14 @@ class InMemoryMusicRepository implements MusicRepository {
 
   @override
   Future<void> markRemoved(String filePath, bool removed) async {
+    await markRemovedMany([filePath], removed);
+  }
+
+  @override
+  Future<void> markRemovedMany(List<String> filePaths, bool removed) async {
     _tracks = _tracks
         .map(
-          (track) => track.filePath == filePath
+          (track) => filePaths.contains(track.filePath)
               ? track.copyWith(isRemoved: removed)
               : track,
         )
@@ -124,7 +130,7 @@ class PersistentMusicRepository implements MusicRepository {
           artist: metadata?.artist,
           album: metadata?.album,
           releaseInfo: metadata?.releaseInfo,
-          isRemoved: row.isRemoved,
+          isRemoved: row.removedAt != null,
         ),
       );
     }
@@ -160,7 +166,7 @@ class PersistentMusicRepository implements MusicRepository {
                 libraryFolderId: folderId,
                 filePath: track.filePath,
                 fileExtension: track.fileExtension,
-                isRemoved: Value(track.isRemoved),
+                removedAt: Value(track.isRemoved ? now : null),
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -211,12 +217,24 @@ class PersistentMusicRepository implements MusicRepository {
 
   @override
   Future<void> markRemoved(String filePath, bool removed) async {
+    await markRemovedMany([filePath], removed);
+  }
+
+  @override
+  Future<void> markRemovedMany(List<String> filePaths, bool removed) async {
     final now = DateTime.now().toUtc();
-    await (_database.update(
-      _database.tracks,
-    )..where((table) => table.filePath.equals(filePath))).write(
-      TracksCompanion(isRemoved: Value(removed), updatedAt: Value(now)),
-    );
+    await _database.transaction(() async {
+      for (final filePath in filePaths) {
+        await (_database.update(
+          _database.tracks,
+        )..where((table) => table.filePath.equals(filePath))).write(
+          TracksCompanion(
+            removedAt: Value(removed ? now : null),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+    });
     await load();
   }
 }
@@ -259,4 +277,8 @@ class LazyPersistentMusicRepository implements MusicRepository {
   @override
   Future<void> markRemoved(String filePath, bool removed) async =>
       (await _open()).markRemoved(filePath, removed);
+
+  @override
+  Future<void> markRemovedMany(List<String> filePaths, bool removed) async =>
+      (await _open()).markRemovedMany(filePaths, removed);
 }

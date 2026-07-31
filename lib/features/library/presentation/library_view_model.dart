@@ -90,6 +90,26 @@ class LibraryViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> removeTracks(List<Track> tracks) async {
+    if (tracks.isEmpty) return true;
+    try {
+      await _repository.markRemovedMany(
+        tracks.map((track) => track.filePath).toList(growable: false),
+        true,
+      );
+      _tracks = _repository.tracks;
+      _status = _tracks.where((track) => !track.isRemoved).isEmpty
+          ? LibraryStatus.empty
+          : LibraryStatus.ready;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } on Object {
+      _setError('楽曲をライブラリから削除できませんでした。');
+      return false;
+    }
+  }
+
   String? _validateDirectory(String path) {
     final entity = Directory(path);
     if (path.trim().isEmpty || !entity.existsSync()) return 'フォルダが見つかりません。';

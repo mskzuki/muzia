@@ -3,6 +3,7 @@ import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart'
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
+import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
 
 enum _LibrarySection { library, artistAlbum }
 
@@ -165,7 +166,10 @@ class _MainContent extends StatelessWidget {
               message: '準備が完了するまでお待ちください。',
             ),
             LibraryStatus.empty => const _EmptyLibrary(),
-            LibraryStatus.ready => _TrackList(tracks: libraryViewModel.tracks),
+            LibraryStatus.ready => _TrackList(
+              tracks: libraryViewModel.tracks,
+              onRemove: libraryViewModel.removeTracks,
+            ),
             LibraryStatus.error => _StatusMessage(
               icon: Icons.error_outline,
               title: '読み込みエラー',
@@ -215,19 +219,65 @@ class _EmptyLibrary extends _StatusMessage {
       );
 }
 
-class _TrackList extends StatelessWidget {
-  const _TrackList({required this.tracks});
+class _TrackList extends StatefulWidget {
+  const _TrackList({required this.tracks, required this.onRemove});
 
   final List<Track> tracks;
+  final Future<bool> Function(List<Track> tracks) onRemove;
+
+  @override
+  State<_TrackList> createState() => _TrackListState();
+}
+
+class _TrackListState extends State<_TrackList> {
+  final Set<String> _selectedPaths = {};
+
+  Future<void> _confirmRemove() async {
+    final selected = widget.tracks
+        .where((track) => _selectedPaths.contains(track.filePath))
+        .toList(growable: false);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => LibraryRemovalDialog(count: selected.length),
+    );
+    if (confirmed != true || !mounted) return;
+    if (await widget.onRemove(selected) && mounted) {
+      setState(_selectedPaths.clear);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final hasSelection = _selectedPaths.isNotEmpty;
     return ListView.separated(
-      itemCount: tracks.length,
+      itemCount: widget.tracks.length + (hasSelection ? 1 : 0),
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final track = tracks[index];
+        if (hasSelection && index == 0) {
+          return Material(
+            color: const Color(0x1FEDF2FE),
+            child: ListTile(
+              title: Text('${_selectedPaths.length}曲を選択中'),
+              trailing: FilledButton.icon(
+                onPressed: _confirmRemove,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('ライブラリから削除'),
+              ),
+            ),
+          );
+        }
+        final track = widget.tracks[hasSelection ? index - 1 : index];
         return ListTile(
+          leading: Checkbox(
+            value: _selectedPaths.contains(track.filePath),
+            onChanged: (selected) => setState(() {
+              if (selected == true) {
+                _selectedPaths.add(track.filePath);
+              } else {
+                _selectedPaths.remove(track.filePath);
+              }
+            }),
+          ),
           title: Text(
             track.title?.isNotEmpty == true ? track.title! : 'タイトル不明',
           ),

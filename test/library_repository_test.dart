@@ -44,4 +44,20 @@ void main() {
     expect(restored.registeredFolder, '/tmp/second');
     expect(restored.tracks, [second]);
   });
+
+  test('複数楽曲を論理削除して元データを保持する', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    const first = Track(filePath: '/tmp/one.mp3', fileExtension: '.mp3');
+    const second = Track(filePath: '/tmp/two.mp3', fileExtension: '.mp3');
+
+    await repository.registerFolder('/tmp/music', const [first, second]);
+    await repository.markRemovedMany([first.filePath, second.filePath], true);
+    final restored = PersistentMusicRepository(database);
+    await restored.load();
+
+    expect(restored.tracks, hasLength(2));
+    expect(restored.tracks.every((track) => track.isRemoved), isTrue);
+  });
 }

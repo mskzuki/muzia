@@ -16,7 +16,7 @@ class Tracks extends Table {
   IntColumn get libraryFolderId => integer()();
   TextColumn get filePath => text().unique()();
   TextColumn get fileExtension => text()();
-  BoolColumn get isRemoved => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get removedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 }

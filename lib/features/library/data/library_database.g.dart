@@ -464,20 +464,16 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _isRemovedMeta = const VerificationMeta(
-    'isRemoved',
+  static const VerificationMeta _removedAtMeta = const VerificationMeta(
+    'removedAt',
   );
   @override
-  late final GeneratedColumn<bool> isRemoved = GeneratedColumn<bool>(
-    'is_removed',
+  late final GeneratedColumn<DateTime> removedAt = GeneratedColumn<DateTime>(
+    'removed_at',
     aliasedName,
-    false,
-    type: DriftSqlType.bool,
+    true,
+    type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_removed" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -507,7 +503,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     libraryFolderId,
     filePath,
     fileExtension,
-    isRemoved,
+    removedAt,
     createdAt,
     updatedAt,
   ];
@@ -556,10 +552,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     } else if (isInserting) {
       context.missing(_fileExtensionMeta);
     }
-    if (data.containsKey('is_removed')) {
+    if (data.containsKey('removed_at')) {
       context.handle(
-        _isRemovedMeta,
-        isRemoved.isAcceptableOrUnknown(data['is_removed']!, _isRemovedMeta),
+        _removedAtMeta,
+        removedAt.isAcceptableOrUnknown(data['removed_at']!, _removedAtMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -603,10 +599,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.string,
         data['${effectivePrefix}file_extension'],
       )!,
-      isRemoved: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_removed'],
-      )!,
+      removedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}removed_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -629,7 +625,7 @@ class Track extends DataClass implements Insertable<Track> {
   final int libraryFolderId;
   final String filePath;
   final String fileExtension;
-  final bool isRemoved;
+  final DateTime? removedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Track({
@@ -637,7 +633,7 @@ class Track extends DataClass implements Insertable<Track> {
     required this.libraryFolderId,
     required this.filePath,
     required this.fileExtension,
-    required this.isRemoved,
+    this.removedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -648,7 +644,9 @@ class Track extends DataClass implements Insertable<Track> {
     map['library_folder_id'] = Variable<int>(libraryFolderId);
     map['file_path'] = Variable<String>(filePath);
     map['file_extension'] = Variable<String>(fileExtension);
-    map['is_removed'] = Variable<bool>(isRemoved);
+    if (!nullToAbsent || removedAt != null) {
+      map['removed_at'] = Variable<DateTime>(removedAt);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -660,7 +658,9 @@ class Track extends DataClass implements Insertable<Track> {
       libraryFolderId: Value(libraryFolderId),
       filePath: Value(filePath),
       fileExtension: Value(fileExtension),
-      isRemoved: Value(isRemoved),
+      removedAt: removedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(removedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -676,7 +676,7 @@ class Track extends DataClass implements Insertable<Track> {
       libraryFolderId: serializer.fromJson<int>(json['libraryFolderId']),
       filePath: serializer.fromJson<String>(json['filePath']),
       fileExtension: serializer.fromJson<String>(json['fileExtension']),
-      isRemoved: serializer.fromJson<bool>(json['isRemoved']),
+      removedAt: serializer.fromJson<DateTime?>(json['removedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -689,7 +689,7 @@ class Track extends DataClass implements Insertable<Track> {
       'libraryFolderId': serializer.toJson<int>(libraryFolderId),
       'filePath': serializer.toJson<String>(filePath),
       'fileExtension': serializer.toJson<String>(fileExtension),
-      'isRemoved': serializer.toJson<bool>(isRemoved),
+      'removedAt': serializer.toJson<DateTime?>(removedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -700,7 +700,7 @@ class Track extends DataClass implements Insertable<Track> {
     int? libraryFolderId,
     String? filePath,
     String? fileExtension,
-    bool? isRemoved,
+    Value<DateTime?> removedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Track(
@@ -708,7 +708,7 @@ class Track extends DataClass implements Insertable<Track> {
     libraryFolderId: libraryFolderId ?? this.libraryFolderId,
     filePath: filePath ?? this.filePath,
     fileExtension: fileExtension ?? this.fileExtension,
-    isRemoved: isRemoved ?? this.isRemoved,
+    removedAt: removedAt.present ? removedAt.value : this.removedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -722,7 +722,7 @@ class Track extends DataClass implements Insertable<Track> {
       fileExtension: data.fileExtension.present
           ? data.fileExtension.value
           : this.fileExtension,
-      isRemoved: data.isRemoved.present ? data.isRemoved.value : this.isRemoved,
+      removedAt: data.removedAt.present ? data.removedAt.value : this.removedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -735,7 +735,7 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('libraryFolderId: $libraryFolderId, ')
           ..write('filePath: $filePath, ')
           ..write('fileExtension: $fileExtension, ')
-          ..write('isRemoved: $isRemoved, ')
+          ..write('removedAt: $removedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -748,7 +748,7 @@ class Track extends DataClass implements Insertable<Track> {
     libraryFolderId,
     filePath,
     fileExtension,
-    isRemoved,
+    removedAt,
     createdAt,
     updatedAt,
   );
@@ -760,7 +760,7 @@ class Track extends DataClass implements Insertable<Track> {
           other.libraryFolderId == this.libraryFolderId &&
           other.filePath == this.filePath &&
           other.fileExtension == this.fileExtension &&
-          other.isRemoved == this.isRemoved &&
+          other.removedAt == this.removedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -770,7 +770,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<int> libraryFolderId;
   final Value<String> filePath;
   final Value<String> fileExtension;
-  final Value<bool> isRemoved;
+  final Value<DateTime?> removedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TracksCompanion({
@@ -778,7 +778,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.libraryFolderId = const Value.absent(),
     this.filePath = const Value.absent(),
     this.fileExtension = const Value.absent(),
-    this.isRemoved = const Value.absent(),
+    this.removedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -787,7 +787,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     required int libraryFolderId,
     required String filePath,
     required String fileExtension,
-    this.isRemoved = const Value.absent(),
+    this.removedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : libraryFolderId = Value(libraryFolderId),
@@ -800,7 +800,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<int>? libraryFolderId,
     Expression<String>? filePath,
     Expression<String>? fileExtension,
-    Expression<bool>? isRemoved,
+    Expression<DateTime>? removedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -809,7 +809,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (libraryFolderId != null) 'library_folder_id': libraryFolderId,
       if (filePath != null) 'file_path': filePath,
       if (fileExtension != null) 'file_extension': fileExtension,
-      if (isRemoved != null) 'is_removed': isRemoved,
+      if (removedAt != null) 'removed_at': removedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -820,7 +820,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<int>? libraryFolderId,
     Value<String>? filePath,
     Value<String>? fileExtension,
-    Value<bool>? isRemoved,
+    Value<DateTime?>? removedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -829,7 +829,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       libraryFolderId: libraryFolderId ?? this.libraryFolderId,
       filePath: filePath ?? this.filePath,
       fileExtension: fileExtension ?? this.fileExtension,
-      isRemoved: isRemoved ?? this.isRemoved,
+      removedAt: removedAt ?? this.removedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -850,8 +850,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (fileExtension.present) {
       map['file_extension'] = Variable<String>(fileExtension.value);
     }
-    if (isRemoved.present) {
-      map['is_removed'] = Variable<bool>(isRemoved.value);
+    if (removedAt.present) {
+      map['removed_at'] = Variable<DateTime>(removedAt.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -869,7 +869,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('libraryFolderId: $libraryFolderId, ')
           ..write('filePath: $filePath, ')
           ..write('fileExtension: $fileExtension, ')
-          ..write('isRemoved: $isRemoved, ')
+          ..write('removedAt: $removedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1526,7 +1526,7 @@ typedef $$TracksTableCreateCompanionBuilder =
       required int libraryFolderId,
       required String filePath,
       required String fileExtension,
-      Value<bool> isRemoved,
+      Value<DateTime?> removedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -1536,7 +1536,7 @@ typedef $$TracksTableUpdateCompanionBuilder =
       Value<int> libraryFolderId,
       Value<String> filePath,
       Value<String> fileExtension,
-      Value<bool> isRemoved,
+      Value<DateTime?> removedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -1570,8 +1570,8 @@ class $$TracksTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isRemoved => $composableBuilder(
-    column: $table.isRemoved,
+  ColumnFilters<DateTime> get removedAt => $composableBuilder(
+    column: $table.removedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1615,8 +1615,8 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isRemoved => $composableBuilder(
-    column: $table.isRemoved,
+  ColumnOrderings<DateTime> get removedAt => $composableBuilder(
+    column: $table.removedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1656,8 +1656,8 @@ class $$TracksTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get isRemoved =>
-      $composableBuilder(column: $table.isRemoved, builder: (column) => column);
+  GeneratedColumn<DateTime> get removedAt =>
+      $composableBuilder(column: $table.removedAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1698,7 +1698,7 @@ class $$TracksTableTableManager
                 Value<int> libraryFolderId = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> fileExtension = const Value.absent(),
-                Value<bool> isRemoved = const Value.absent(),
+                Value<DateTime?> removedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TracksCompanion(
@@ -1706,7 +1706,7 @@ class $$TracksTableTableManager
                 libraryFolderId: libraryFolderId,
                 filePath: filePath,
                 fileExtension: fileExtension,
-                isRemoved: isRemoved,
+                removedAt: removedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -1716,7 +1716,7 @@ class $$TracksTableTableManager
                 required int libraryFolderId,
                 required String filePath,
                 required String fileExtension,
-                Value<bool> isRemoved = const Value.absent(),
+                Value<DateTime?> removedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => TracksCompanion.insert(
@@ -1724,7 +1724,7 @@ class $$TracksTableTableManager
                 libraryFolderId: libraryFolderId,
                 filePath: filePath,
                 fileExtension: fileExtension,
-                isRemoved: isRemoved,
+                removedAt: removedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

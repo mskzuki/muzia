@@ -1,0 +1,55 @@
+# Flutter / Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+build/
+
+# Generated platform files
+android/.gradle/
+android/local.properties
+ios/Flutter/ephemeral/
+ios/Pods/
+macos/Flutter/ephemeral/
+macos/Pods/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# IDE settings
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+**/.DS_Store
+macos/Runner.xcodeproj/xcuserdata/
+macos/Runner.xcworkspace/xcuserdata/
+
+# Windows / Visual Studio user files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+windows/runner/*.vcxproj.user
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+
+# Test and coverage output
+coverage/
+test-results/
+screenshots/
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/

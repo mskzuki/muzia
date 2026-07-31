@@ -23,6 +23,5 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('playback-toggle')));
     await tester.pump();
     expect(find.byTooltip('再生'), findsOneWidget);
-    player.dispose();
   });
 }

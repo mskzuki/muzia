@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_page.dart';
+import 'package:muzia/app/providers.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
-import 'package:muzia/features/playback/domain/audio_player_service.dart';
 
 void runMuziaApp({
   AppShellViewModel? viewModel,
@@ -33,18 +34,22 @@ class MuziaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Muzia',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
-      home: AppShellPage(
-        viewModel: viewModel ?? AppShellViewModel(),
-        libraryViewModel: libraryViewModel ?? LibraryViewModel(),
-        playerViewModel:
-            playerViewModel ??
-            PlayerViewModel(service: FakeAudioPlayerService()),
+    return ProviderScope(
+      overrides: [
+        if (viewModel != null)
+          appShellViewModelProvider.overrideWith((ref) => viewModel!),
+        if (libraryViewModel != null)
+          libraryViewModelProvider.overrideWith((ref) => libraryViewModel!),
+        if (playerViewModel != null)
+          playerViewModelProvider.overrideWith((ref) => playerViewModel!),
+      ],
+      child: MaterialApp(
+        title: 'Muzia',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          useMaterial3: true,
+        ),
+        home: const AppShellPage(),
       ),
     );
   }

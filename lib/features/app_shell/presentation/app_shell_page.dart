@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:muzia/app/providers.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
@@ -11,23 +13,14 @@ import 'package:muzia/features/playback/presentation/player_view_model.dart';
 
 enum _LibrarySection { library, artistAlbum }
 
-class AppShellPage extends StatefulWidget {
-  const AppShellPage({
-    super.key,
-    required this.viewModel,
-    required this.libraryViewModel,
-    required this.playerViewModel,
-  });
-
-  final AppShellViewModel viewModel;
-  final LibraryViewModel libraryViewModel;
-  final PlayerViewModel playerViewModel;
+class AppShellPage extends ConsumerStatefulWidget {
+  const AppShellPage({super.key});
 
   @override
-  State<AppShellPage> createState() => _AppShellPageState();
+  ConsumerState<AppShellPage> createState() => _AppShellPageState();
 }
 
-class _AppShellPageState extends State<AppShellPage> {
+class _AppShellPageState extends ConsumerState<AppShellPage> {
   _LibrarySection _section = _LibrarySection.library;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -35,28 +28,23 @@ class _AppShellPageState extends State<AppShellPage> {
   @override
   void initState() {
     super.initState();
-    widget.viewModel.addListener(_onViewModelChanged);
-    widget.libraryViewModel.addListener(_onViewModelChanged);
-    widget.playerViewModel.addListener(_onViewModelChanged);
-    widget.viewModel.initialize();
-    widget.libraryViewModel.initialize();
+    Future.microtask(() {
+      ref.read(appShellViewModelProvider).initialize();
+      ref.read(libraryViewModelProvider).initialize();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    widget.viewModel.removeListener(_onViewModelChanged);
-    widget.libraryViewModel.removeListener(_onViewModelChanged);
-    widget.playerViewModel.removeListener(_onViewModelChanged);
     super.dispose();
-  }
-
-  void _onViewModelChanged() {
-    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = ref.watch(appShellViewModelProvider);
+    final libraryViewModel = ref.watch(libraryViewModelProvider);
+    final playerViewModel = ref.watch(playerViewModelProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Muzia'),
@@ -104,24 +92,24 @@ class _AppShellPageState extends State<AppShellPage> {
             child: Row(
               children: [
                 _Sidebar(
-                  onPickFolder: widget.libraryViewModel.chooseAndScanFolder,
+                  onPickFolder: libraryViewModel.chooseAndScanFolder,
                   section: _section,
                   onSectionChanged: (section) =>
                       setState(() => _section = section),
                 ),
                 Expanded(
                   child: _MainContent(
-                    viewModel: widget.viewModel,
-                    libraryViewModel: widget.libraryViewModel,
+                    viewModel: viewModel,
+                    libraryViewModel: libraryViewModel,
                     section: _section,
                     searchQuery: _searchQuery,
-                    onPlay: widget.playerViewModel.play,
+                    onPlay: playerViewModel.play,
                   ),
                 ),
               ],
             ),
           ),
-          _PlayerArea(viewModel: widget.playerViewModel),
+          _PlayerArea(viewModel: playerViewModel),
         ],
       ),
     );

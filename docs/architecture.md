@@ -203,7 +203,7 @@ PlayerBarなどを更新
 
 ## 5. 状態管理
 
-状態管理ライブラリは未決定である。採用後も、状態の所有者と公開範囲を明確にする。
+状態管理にはRiverpodを採用する。初回導入では既存のChangeNotifier ViewModelをProviderで管理し、状態遷移が増えた機能からNotifierまたはAsyncNotifierへ段階的に移行する。採用後も、状態の所有者と公開範囲を明確にする。
 
 - 画面固有の一時状態は、該当するViewまたはViewModelが管理する
 - 複数画面で共有する状態は、適切な上位のViewModelまたはアプリケーション状態で管理する

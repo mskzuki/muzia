@@ -7,6 +7,7 @@ import 'package:muzia/features/library/presentation/library_removal_dialog.dart'
 import 'package:muzia/features/library/domain/library_search.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
+import 'package:muzia/features/playback/presentation/player_view_model.dart';
 
 enum _LibrarySection { library, artistAlbum }
 
@@ -15,10 +16,12 @@ class AppShellPage extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.libraryViewModel,
+    required this.playerViewModel,
   });
 
   final AppShellViewModel viewModel;
   final LibraryViewModel libraryViewModel;
+  final PlayerViewModel playerViewModel;
 
   @override
   State<AppShellPage> createState() => _AppShellPageState();
@@ -34,6 +37,7 @@ class _AppShellPageState extends State<AppShellPage> {
     super.initState();
     widget.viewModel.addListener(_onViewModelChanged);
     widget.libraryViewModel.addListener(_onViewModelChanged);
+    widget.playerViewModel.addListener(_onViewModelChanged);
     widget.viewModel.initialize();
     widget.libraryViewModel.initialize();
   }
@@ -43,6 +47,7 @@ class _AppShellPageState extends State<AppShellPage> {
     _searchController.dispose();
     widget.viewModel.removeListener(_onViewModelChanged);
     widget.libraryViewModel.removeListener(_onViewModelChanged);
+    widget.playerViewModel.removeListener(_onViewModelChanged);
     super.dispose();
   }
 
@@ -110,12 +115,13 @@ class _AppShellPageState extends State<AppShellPage> {
                     libraryViewModel: widget.libraryViewModel,
                     section: _section,
                     searchQuery: _searchQuery,
+                    onPlay: widget.playerViewModel.play,
                   ),
                 ),
               ],
             ),
           ),
-          const _PlayerArea(),
+          _PlayerArea(viewModel: widget.playerViewModel),
         ],
       ),
     );
@@ -180,12 +186,14 @@ class _MainContent extends StatelessWidget {
     required this.libraryViewModel,
     required this.section,
     required this.searchQuery,
+    required this.onPlay,
   });
 
   final AppShellViewModel viewModel;
   final LibraryViewModel libraryViewModel;
   final _LibrarySection section;
   final String searchQuery;
+  final ValueChanged<Track> onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +240,7 @@ class _MainContent extends StatelessWidget {
               onEdit: (track, values) =>
                   libraryViewModel.updateTrackMetadata(track, values),
               onBulkEdit: libraryViewModel.updateTracksMetadata,
+              onPlay: onPlay,
             ),
             LibraryStatus.error => _StatusMessage(
               icon: Icons.error_outline,
@@ -288,6 +297,7 @@ class _TrackList extends StatefulWidget {
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
+    required this.onPlay,
   });
 
   final List<Track> tracks;
@@ -295,6 +305,7 @@ class _TrackList extends StatefulWidget {
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
   onBulkEdit;
+  final ValueChanged<Track> onPlay;
 
   @override
   State<_TrackList> createState() => _TrackListState();
@@ -413,6 +424,7 @@ class _TrackListState extends State<_TrackList> {
             icon: const Icon(Icons.edit_outlined),
             onPressed: () => _editTrack(track),
           ),
+          onTap: () => widget.onPlay(track),
         );
       },
     );
@@ -420,7 +432,9 @@ class _TrackListState extends State<_TrackList> {
 }
 
 class _PlayerArea extends StatelessWidget {
-  const _PlayerArea();
+  const _PlayerArea({required this.viewModel});
+
+  final PlayerViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -432,8 +446,51 @@ class _PlayerArea extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainer,
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
-      alignment: Alignment.centerLeft,
-      child: const Text('再生する楽曲が選択されていません'),
+      child: viewModel.track == null
+          ? const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('再生する楽曲が選択されていません'),
+            )
+          : Row(
+              children: [
+                const Icon(Icons.music_note, color: Color(0xFF3E63DD)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(viewModel.track!.title ?? 'タイトル不明'),
+                      Text(viewModel.track!.artist ?? 'アーティスト不明'),
+                    ],
+                  ),
+                ),
+                if (viewModel.status == PlaybackStatus.error)
+                  Expanded(
+                    child: Text(
+                      viewModel.errorMessage ?? '再生に失敗しました。',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                if (viewModel.status == PlaybackStatus.loading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    key: const ValueKey('playback-toggle'),
+                    tooltip: viewModel.isPlaying ? '一時停止' : '再生',
+                    onPressed: viewModel.togglePause,
+                    icon: Icon(
+                      viewModel.isPlaying ? Icons.pause : Icons.play_arrow,
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }

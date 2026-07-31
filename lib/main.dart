@@ -1,6 +1,13 @@
 import 'package:muzia/app/app.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:muzia/features/playback/presentation/player_view_model.dart';
+import 'package:muzia/features/playback/domain/audio_player_service.dart';
 
 void main() {
-  runMuziaApp(libraryViewModel: LibraryViewModel.persistent());
+  MediaKit.ensureInitialized();
+  runMuziaApp(
+    libraryViewModel: LibraryViewModel.persistent(),
+    playerViewModel: PlayerViewModel(service: MediaKitAudioPlayerService()),
+  );
 }

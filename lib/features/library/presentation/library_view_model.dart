@@ -4,6 +4,7 @@ import 'package:muzia/features/library/data/directory_service.dart';
 import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
+import 'package:muzia/features/library/data/security_scoped_bookmark_service.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 
@@ -15,26 +16,35 @@ class LibraryViewModel extends ChangeNotifier {
     FileScannerService? scanner,
     DirectoryService? directoryService,
     MusicRepository? repository,
+    SecurityScopedBookmarkService? bookmarkService,
   }) : _picker = picker ?? NativeFilePickerService(),
        _scanner = scanner ?? LocalFileScannerService(),
        _directoryService = directoryService ?? NativeDirectoryService(),
-       _repository = repository ?? InMemoryMusicRepository();
+       _repository = repository ?? InMemoryMusicRepository(),
+       _bookmarkService =
+           bookmarkService ?? const NoopSecurityScopedBookmarkService();
 
   LibraryViewModel.persistent({
     FilePickerService? picker,
     FileScannerService? scanner,
     DirectoryService? directoryService,
+    SecurityScopedBookmarkService? bookmarkService,
   }) : this(
          picker: picker,
          scanner: scanner,
          directoryService: directoryService,
-         repository: LazyPersistentMusicRepository(),
+         repository: LazyPersistentMusicRepository(
+           bookmarkService: bookmarkService,
+         ),
+         bookmarkService:
+             bookmarkService ?? NativeSecurityScopedBookmarkService(),
        );
 
   final FilePickerService _picker;
   final FileScannerService _scanner;
   final DirectoryService _directoryService;
   final MusicRepository _repository;
+  final SecurityScopedBookmarkService _bookmarkService;
   LibraryStatus _status = LibraryStatus.empty;
   List<Track> _tracks = const [];
   String? _errorMessage;
@@ -66,10 +76,14 @@ class LibraryViewModel extends ChangeNotifier {
   Future<void> chooseAndScanFolder() async {
     final selectedPath = await _picker.pickDirectory();
     if (selectedPath == null) return;
-    await registerAndScan(selectedPath);
+    final bookmark = await _bookmarkService.createBookmark(selectedPath);
+    await registerAndScan(selectedPath, securityScopedBookmark: bookmark);
   }
 
-  Future<void> registerAndScan(String path) async {
+  Future<void> registerAndScan(
+    String path, {
+    Uint8List? securityScopedBookmark,
+  }) async {
     final validationError = await _validateDirectory(path);
     if (validationError != null) {
       _setError(validationError);
@@ -111,7 +125,11 @@ class LibraryViewModel extends ChangeNotifier {
       } else {
         _status = LibraryStatus.ready;
       }
-      await _repository.registerFolder(path, tracks);
+      await _repository.registerFolder(
+        path,
+        tracks,
+        securityScopedBookmark: securityScopedBookmark,
+      );
       notifyListeners();
     } on FolderAccessException {
       _setError('フォルダにアクセスできません。権限を確認してください。');
@@ -156,6 +174,12 @@ class LibraryViewModel extends ChangeNotifier {
         values,
       );
       _tracks = _repository.tracks;
+      _status = _tracks.where((track) => !track.isRemoved).isEmpty
+          ? LibraryStatus.empty
+          : _warningMessage != null
+          ? LibraryStatus.readyWithWarnings
+          : LibraryStatus.ready;
+      _errorMessage = null;
       notifyListeners();
       return true;
     } on Object {

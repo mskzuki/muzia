@@ -1,11 +1,40 @@
+import 'dart:typed_data';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/library_database.dart' hide Track;
 import 'package:muzia/features/library/data/music_repository.dart';
+import 'package:muzia/features/library/data/security_scoped_bookmark_service.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 
 void main() {
+  test('security-scoped bookmarkを保存して復元する', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final bookmarkService = _FakeBookmarkService();
+    final repository = PersistentMusicRepository(
+      database,
+      bookmarkService: bookmarkService,
+    );
+    const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
+    final bookmark = Uint8List.fromList([1, 2, 3]);
+
+    await repository.registerFolder('/tmp/music', const [
+      track,
+    ], securityScopedBookmark: bookmark);
+    final restored = PersistentMusicRepository(
+      database,
+      bookmarkService: bookmarkService,
+    );
+    await restored.load();
+
+    expect(bookmarkService.restored, [1, 2, 3]);
+    expect(restored.registeredFolder, '/tmp/music');
+    final folder = await database.select(database.libraryFolders).getSingle();
+    expect(folder.securityScopedBookmark, [1, 2, 3]);
+  });
+
   test('登録フォルダと楽曲メタデータを保存して復元する', () async {
     final database = LibraryDatabase(NativeDatabase.memory());
     addTearDown(database.close);
@@ -174,4 +203,23 @@ void main() {
     expect(saved.album, isNull);
     expect(saved.releaseInfo, isNull);
   });
+}
+
+class _FakeBookmarkService implements SecurityScopedBookmarkService {
+  List<int>? restored;
+
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async {
+    restored = bookmark;
+    return RestoredSecurityScopedBookmark(
+      path: '/tmp/music',
+      bookmark: bookmark,
+    );
+  }
 }

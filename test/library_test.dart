@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
+import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 
@@ -136,6 +137,46 @@ void main() {
     expect(viewModel.status, LibraryStatus.error);
     expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
   });
+
+  test('保存失敗後の再保存成功で一覧表示可能な状態へ戻る', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final track = Track(
+      filePath: '${directory.path}/song.mp3',
+      fileExtension: '.mp3',
+    );
+    final repository = _FailOnceMetadataRepository();
+    await repository.registerFolder(directory.path, [track]);
+    final viewModel = LibraryViewModel(repository: repository);
+    await viewModel.initialize();
+
+    final values = const MetadataValues(title: '更新後の曲名');
+    expect(await viewModel.updateTrackMetadata(track, values), isFalse);
+    expect(viewModel.status, LibraryStatus.error);
+
+    expect(await viewModel.updateTrackMetadata(track, values), isTrue);
+    expect(viewModel.status, LibraryStatus.ready);
+    expect(viewModel.errorMessage, isNull);
+    expect(viewModel.tracks.single.title, '更新後の曲名');
+  });
+}
+
+class _FailOnceMetadataRepository extends InMemoryMusicRepository {
+  var _shouldFail = true;
+
+  @override
+  Future<void> updateMetadataMany(
+    List<String> filePaths,
+    MetadataValues values,
+  ) async {
+    if (_shouldFail) {
+      _shouldFail = false;
+      throw StateError('保存失敗');
+    }
+    await super.updateMetadataMany(filePaths, values);
+  }
 }
 
 class _IssueScanner implements FileScannerService {

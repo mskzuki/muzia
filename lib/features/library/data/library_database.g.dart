@@ -32,6 +32,17 @@ class $LibraryFoldersTable extends LibraryFolders
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
+  static const VerificationMeta _securityScopedBookmarkMeta =
+      const VerificationMeta('securityScopedBookmark');
+  @override
+  late final GeneratedColumn<Uint8List> securityScopedBookmark =
+      GeneratedColumn<Uint8List>(
+        'security_scoped_bookmark',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -85,6 +96,7 @@ class $LibraryFoldersTable extends LibraryFolders
   List<GeneratedColumn> get $columns => [
     id,
     path,
+    securityScopedBookmark,
     isActive,
     lastScannedAt,
     createdAt,
@@ -112,6 +124,15 @@ class $LibraryFoldersTable extends LibraryFolders
       );
     } else if (isInserting) {
       context.missing(_pathMeta);
+    }
+    if (data.containsKey('security_scoped_bookmark')) {
+      context.handle(
+        _securityScopedBookmarkMeta,
+        securityScopedBookmark.isAcceptableOrUnknown(
+          data['security_scoped_bookmark']!,
+          _securityScopedBookmarkMeta,
+        ),
+      );
     }
     if (data.containsKey('is_active')) {
       context.handle(
@@ -161,6 +182,10 @@ class $LibraryFoldersTable extends LibraryFolders
         DriftSqlType.string,
         data['${effectivePrefix}path'],
       )!,
+      securityScopedBookmark: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}security_scoped_bookmark'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -189,6 +214,7 @@ class $LibraryFoldersTable extends LibraryFolders
 class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
   final int id;
   final String path;
+  final Uint8List? securityScopedBookmark;
   final bool isActive;
   final DateTime? lastScannedAt;
   final DateTime createdAt;
@@ -196,6 +222,7 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
   const LibraryFolder({
     required this.id,
     required this.path,
+    this.securityScopedBookmark,
     required this.isActive,
     this.lastScannedAt,
     required this.createdAt,
@@ -206,6 +233,11 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['path'] = Variable<String>(path);
+    if (!nullToAbsent || securityScopedBookmark != null) {
+      map['security_scoped_bookmark'] = Variable<Uint8List>(
+        securityScopedBookmark,
+      );
+    }
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || lastScannedAt != null) {
       map['last_scanned_at'] = Variable<DateTime>(lastScannedAt);
@@ -219,6 +251,9 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     return LibraryFoldersCompanion(
       id: Value(id),
       path: Value(path),
+      securityScopedBookmark: securityScopedBookmark == null && nullToAbsent
+          ? const Value.absent()
+          : Value(securityScopedBookmark),
       isActive: Value(isActive),
       lastScannedAt: lastScannedAt == null && nullToAbsent
           ? const Value.absent()
@@ -236,6 +271,9 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     return LibraryFolder(
       id: serializer.fromJson<int>(json['id']),
       path: serializer.fromJson<String>(json['path']),
+      securityScopedBookmark: serializer.fromJson<Uint8List?>(
+        json['securityScopedBookmark'],
+      ),
       isActive: serializer.fromJson<bool>(json['isActive']),
       lastScannedAt: serializer.fromJson<DateTime?>(json['lastScannedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -248,6 +286,9 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'path': serializer.toJson<String>(path),
+      'securityScopedBookmark': serializer.toJson<Uint8List?>(
+        securityScopedBookmark,
+      ),
       'isActive': serializer.toJson<bool>(isActive),
       'lastScannedAt': serializer.toJson<DateTime?>(lastScannedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -258,6 +299,7 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
   LibraryFolder copyWith({
     int? id,
     String? path,
+    Value<Uint8List?> securityScopedBookmark = const Value.absent(),
     bool? isActive,
     Value<DateTime?> lastScannedAt = const Value.absent(),
     DateTime? createdAt,
@@ -265,6 +307,9 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
   }) => LibraryFolder(
     id: id ?? this.id,
     path: path ?? this.path,
+    securityScopedBookmark: securityScopedBookmark.present
+        ? securityScopedBookmark.value
+        : this.securityScopedBookmark,
     isActive: isActive ?? this.isActive,
     lastScannedAt: lastScannedAt.present
         ? lastScannedAt.value
@@ -276,6 +321,9 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     return LibraryFolder(
       id: data.id.present ? data.id.value : this.id,
       path: data.path.present ? data.path.value : this.path,
+      securityScopedBookmark: data.securityScopedBookmark.present
+          ? data.securityScopedBookmark.value
+          : this.securityScopedBookmark,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       lastScannedAt: data.lastScannedAt.present
           ? data.lastScannedAt.value
@@ -290,6 +338,7 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
     return (StringBuffer('LibraryFolder(')
           ..write('id: $id, ')
           ..write('path: $path, ')
+          ..write('securityScopedBookmark: $securityScopedBookmark, ')
           ..write('isActive: $isActive, ')
           ..write('lastScannedAt: $lastScannedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -299,14 +348,25 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, path, isActive, lastScannedAt, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    path,
+    $driftBlobEquality.hash(securityScopedBookmark),
+    isActive,
+    lastScannedAt,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LibraryFolder &&
           other.id == this.id &&
           other.path == this.path &&
+          $driftBlobEquality.equals(
+            other.securityScopedBookmark,
+            this.securityScopedBookmark,
+          ) &&
           other.isActive == this.isActive &&
           other.lastScannedAt == this.lastScannedAt &&
           other.createdAt == this.createdAt &&
@@ -316,6 +376,7 @@ class LibraryFolder extends DataClass implements Insertable<LibraryFolder> {
 class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
   final Value<int> id;
   final Value<String> path;
+  final Value<Uint8List?> securityScopedBookmark;
   final Value<bool> isActive;
   final Value<DateTime?> lastScannedAt;
   final Value<DateTime> createdAt;
@@ -323,6 +384,7 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
   const LibraryFoldersCompanion({
     this.id = const Value.absent(),
     this.path = const Value.absent(),
+    this.securityScopedBookmark = const Value.absent(),
     this.isActive = const Value.absent(),
     this.lastScannedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -331,6 +393,7 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
   LibraryFoldersCompanion.insert({
     this.id = const Value.absent(),
     required String path,
+    this.securityScopedBookmark = const Value.absent(),
     this.isActive = const Value.absent(),
     this.lastScannedAt = const Value.absent(),
     required DateTime createdAt,
@@ -341,6 +404,7 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
   static Insertable<LibraryFolder> custom({
     Expression<int>? id,
     Expression<String>? path,
+    Expression<Uint8List>? securityScopedBookmark,
     Expression<bool>? isActive,
     Expression<DateTime>? lastScannedAt,
     Expression<DateTime>? createdAt,
@@ -349,6 +413,8 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (path != null) 'path': path,
+      if (securityScopedBookmark != null)
+        'security_scoped_bookmark': securityScopedBookmark,
       if (isActive != null) 'is_active': isActive,
       if (lastScannedAt != null) 'last_scanned_at': lastScannedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -359,6 +425,7 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
   LibraryFoldersCompanion copyWith({
     Value<int>? id,
     Value<String>? path,
+    Value<Uint8List?>? securityScopedBookmark,
     Value<bool>? isActive,
     Value<DateTime?>? lastScannedAt,
     Value<DateTime>? createdAt,
@@ -367,6 +434,8 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
     return LibraryFoldersCompanion(
       id: id ?? this.id,
       path: path ?? this.path,
+      securityScopedBookmark:
+          securityScopedBookmark ?? this.securityScopedBookmark,
       isActive: isActive ?? this.isActive,
       lastScannedAt: lastScannedAt ?? this.lastScannedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -382,6 +451,11 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
     }
     if (path.present) {
       map['path'] = Variable<String>(path.value);
+    }
+    if (securityScopedBookmark.present) {
+      map['security_scoped_bookmark'] = Variable<Uint8List>(
+        securityScopedBookmark.value,
+      );
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -403,6 +477,7 @@ class LibraryFoldersCompanion extends UpdateCompanion<LibraryFolder> {
     return (StringBuffer('LibraryFoldersCompanion(')
           ..write('id: $id, ')
           ..write('path: $path, ')
+          ..write('securityScopedBookmark: $securityScopedBookmark, ')
           ..write('isActive: $isActive, ')
           ..write('lastScannedAt: $lastScannedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -1713,6 +1788,7 @@ typedef $$LibraryFoldersTableCreateCompanionBuilder =
     LibraryFoldersCompanion Function({
       Value<int> id,
       required String path,
+      Value<Uint8List?> securityScopedBookmark,
       Value<bool> isActive,
       Value<DateTime?> lastScannedAt,
       required DateTime createdAt,
@@ -1722,6 +1798,7 @@ typedef $$LibraryFoldersTableUpdateCompanionBuilder =
     LibraryFoldersCompanion Function({
       Value<int> id,
       Value<String> path,
+      Value<Uint8List?> securityScopedBookmark,
       Value<bool> isActive,
       Value<DateTime?> lastScannedAt,
       Value<DateTime> createdAt,
@@ -1744,6 +1821,11 @@ class $$LibraryFoldersTableFilterComposer
 
   ColumnFilters<String> get path => $composableBuilder(
     column: $table.path,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get securityScopedBookmark => $composableBuilder(
+    column: $table.securityScopedBookmark,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1787,6 +1869,11 @@ class $$LibraryFoldersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<Uint8List> get securityScopedBookmark => $composableBuilder(
+    column: $table.securityScopedBookmark,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -1822,6 +1909,11 @@ class $$LibraryFoldersTableAnnotationComposer
 
   GeneratedColumn<String> get path =>
       $composableBuilder(column: $table.path, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get securityScopedBookmark => $composableBuilder(
+    column: $table.securityScopedBookmark,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -1877,6 +1969,7 @@ class $$LibraryFoldersTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> path = const Value.absent(),
+                Value<Uint8List?> securityScopedBookmark = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> lastScannedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -1884,6 +1977,7 @@ class $$LibraryFoldersTableTableManager
               }) => LibraryFoldersCompanion(
                 id: id,
                 path: path,
+                securityScopedBookmark: securityScopedBookmark,
                 isActive: isActive,
                 lastScannedAt: lastScannedAt,
                 createdAt: createdAt,
@@ -1893,6 +1987,7 @@ class $$LibraryFoldersTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String path,
+                Value<Uint8List?> securityScopedBookmark = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> lastScannedAt = const Value.absent(),
                 required DateTime createdAt,
@@ -1900,6 +1995,7 @@ class $$LibraryFoldersTableTableManager
               }) => LibraryFoldersCompanion.insert(
                 id: id,
                 path: path,
+                securityScopedBookmark: securityScopedBookmark,
                 isActive: isActive,
                 lastScannedAt: lastScannedAt,
                 createdAt: createdAt,

@@ -5,6 +5,7 @@ part 'library_database.g.dart';
 class LibraryFolders extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get path => text().unique()();
+  BlobColumn get securityScopedBookmark => blob().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get lastScannedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
@@ -52,13 +53,19 @@ class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       if (from < 2) await m.createTable(trackSourceMetadata);
+      if (from < 3) {
+        await m.addColumn(
+          libraryFolders,
+          libraryFolders.securityScopedBookmark,
+        );
+      }
     },
   );
 }

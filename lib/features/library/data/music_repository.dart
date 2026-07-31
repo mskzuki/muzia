@@ -7,12 +7,17 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:muzia/features/library/data/library_database.dart' hide Track;
+import 'package:muzia/features/library/data/security_scoped_bookmark_service.dart';
 
 abstract interface class MusicRepository {
   Future<void> load();
   String? get registeredFolder;
   List<Track> get tracks;
-  Future<void> registerFolder(String path, List<Track> tracks);
+  Future<void> registerFolder(
+    String path,
+    List<Track> tracks, {
+    Uint8List? securityScopedBookmark,
+  });
   Future<void> updateMetadata(
     String filePath, {
     required MetadataValues values,
@@ -39,7 +44,11 @@ class InMemoryMusicRepository implements MusicRepository {
   List<Track> get tracks => List.unmodifiable(_tracks);
 
   @override
-  Future<void> registerFolder(String path, List<Track> tracks) async {
+  Future<void> registerFolder(
+    String path,
+    List<Track> tracks, {
+    Uint8List? securityScopedBookmark,
+  }) async {
     _registeredFolder = path;
     _tracks = List.unmodifiable(tracks);
   }
@@ -82,20 +91,30 @@ class InMemoryMusicRepository implements MusicRepository {
 }
 
 class PersistentMusicRepository implements MusicRepository {
-  PersistentMusicRepository(this._database);
+  PersistentMusicRepository(
+    this._database, {
+    SecurityScopedBookmarkService? bookmarkService,
+  }) : _bookmarkService =
+           bookmarkService ?? NativeSecurityScopedBookmarkService();
 
   final LibraryDatabase _database;
+  final SecurityScopedBookmarkService _bookmarkService;
   String? _registeredFolder;
   List<Track> _tracks = const [];
 
-  static Future<PersistentMusicRepository> open() async {
+  static Future<PersistentMusicRepository> open({
+    SecurityScopedBookmarkService? bookmarkService,
+  }) async {
     final supportDirectory = await getApplicationSupportDirectory();
     final databaseDirectory = Directory(supportDirectory.path);
     await databaseDirectory.create(recursive: true);
     final database = LibraryDatabase(
       NativeDatabase(File(p.join(databaseDirectory.path, 'muzia.sqlite'))),
     );
-    return PersistentMusicRepository(database);
+    return PersistentMusicRepository(
+      database,
+      bookmarkService: bookmarkService,
+    );
   }
 
   @override
@@ -134,12 +153,37 @@ class PersistentMusicRepository implements MusicRepository {
         ),
       );
     }
-    _registeredFolder = folder.path;
+    var folderPath = folder.path;
+    var bookmark = folder.securityScopedBookmark;
+    if (bookmark != null) {
+      final restored = await _bookmarkService.restoreBookmark(bookmark);
+      if (restored != null) {
+        folderPath = restored.path;
+        bookmark = restored.bookmark;
+        if (folderPath != folder.path ||
+            bookmark != folder.securityScopedBookmark) {
+          await (_database.update(
+            _database.libraryFolders,
+          )..where((table) => table.id.equals(folder.id))).write(
+            LibraryFoldersCompanion(
+              path: Value(folderPath),
+              securityScopedBookmark: Value(bookmark),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
+        }
+      }
+    }
+    _registeredFolder = folderPath;
     _tracks = List.unmodifiable(loaded);
   }
 
   @override
-  Future<void> registerFolder(String path, List<Track> tracks) async {
+  Future<void> registerFolder(
+    String path,
+    List<Track> tracks, {
+    Uint8List? securityScopedBookmark,
+  }) async {
     final now = DateTime.now().toUtc();
     await _database.transaction(() async {
       await _database.delete(_database.trackSourceMetadata).go();
@@ -152,6 +196,7 @@ class PersistentMusicRepository implements MusicRepository {
           .insert(
             LibraryFoldersCompanion.insert(
               path: path,
+              securityScopedBookmark: Value(securityScopedBookmark),
               isActive: const Value(true),
               lastScannedAt: Value(now),
               createdAt: now,
@@ -265,10 +310,15 @@ Value<String?> _column(MetadataValues values, MetadataField field) =>
     values.changes(field) ? Value(values.valueOf(field)) : const Value.absent();
 
 class LazyPersistentMusicRepository implements MusicRepository {
+  LazyPersistentMusicRepository({this._bookmarkService});
+
+  final SecurityScopedBookmarkService? _bookmarkService;
   PersistentMusicRepository? _delegate;
 
   Future<PersistentMusicRepository> _open() async {
-    return _delegate ??= await PersistentMusicRepository.open();
+    return _delegate ??= await PersistentMusicRepository.open(
+      bookmarkService: _bookmarkService,
+    );
   }
 
   @override
@@ -281,8 +331,15 @@ class LazyPersistentMusicRepository implements MusicRepository {
   List<Track> get tracks => _delegate?.tracks ?? const [];
 
   @override
-  Future<void> registerFolder(String path, List<Track> tracks) async =>
-      (await _open()).registerFolder(path, tracks);
+  Future<void> registerFolder(
+    String path,
+    List<Track> tracks, {
+    Uint8List? securityScopedBookmark,
+  }) async => (await _open()).registerFolder(
+    path,
+    tracks,
+    securityScopedBookmark: securityScopedBookmark,
+  );
 
   @override
   Future<void> updateMetadata(

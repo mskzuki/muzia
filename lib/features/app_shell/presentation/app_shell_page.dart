@@ -4,6 +4,7 @@ import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
 import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
+import 'package:muzia/features/library/domain/library_search.dart';
 
 enum _LibrarySection { library, artistAlbum }
 
@@ -23,6 +24,9 @@ class AppShellPage extends StatefulWidget {
 
 class _AppShellPageState extends State<AppShellPage> {
   _LibrarySection _section = _LibrarySection.library;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +38,7 @@ class _AppShellPageState extends State<AppShellPage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     widget.viewModel.removeListener(_onViewModelChanged);
     widget.libraryViewModel.removeListener(_onViewModelChanged);
     super.dispose();
@@ -46,7 +51,46 @@ class _AppShellPageState extends State<AppShellPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Muzia'), toolbarHeight: 56),
+      appBar: AppBar(
+        title: const Text('Muzia'),
+        toolbarHeight: 56,
+        actions: [
+          SizedBox(
+            width: 240,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: TextField(
+                key: const ValueKey('library-search'),
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: '検索',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -63,6 +107,7 @@ class _AppShellPageState extends State<AppShellPage> {
                     viewModel: widget.viewModel,
                     libraryViewModel: widget.libraryViewModel,
                     section: _section,
+                    searchQuery: _searchQuery,
                   ),
                 ),
               ],
@@ -132,11 +177,13 @@ class _MainContent extends StatelessWidget {
     required this.viewModel,
     required this.libraryViewModel,
     required this.section,
+    required this.searchQuery,
   });
 
   final AppShellViewModel viewModel;
   final LibraryViewModel libraryViewModel;
   final _LibrarySection section;
+  final String searchQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +194,10 @@ class _MainContent extends StatelessWidget {
         child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),
       );
     }
+    final visibleTracks = LibrarySearch.filter(
+      libraryViewModel.tracks,
+      searchQuery,
+    );
     final content = viewModel.status == AppShellStatus.loading
         ? const _StatusMessage(
             icon: Icons.hourglass_top,
@@ -166,8 +217,15 @@ class _MainContent extends StatelessWidget {
               message: '準備が完了するまでお待ちください。',
             ),
             LibraryStatus.empty => const _EmptyLibrary(),
+            LibraryStatus.ready
+                when searchQuery.trim().isNotEmpty && visibleTracks.isEmpty =>
+              const _StatusMessage(
+                icon: Icons.search_off,
+                title: '該当する楽曲がありません',
+                message: 'タイトル、アーティスト、アルバムを確認してください。',
+              ),
             LibraryStatus.ready => _TrackList(
-              tracks: libraryViewModel.tracks,
+              tracks: visibleTracks,
               onRemove: libraryViewModel.removeTracks,
             ),
             LibraryStatus.error => _StatusMessage(

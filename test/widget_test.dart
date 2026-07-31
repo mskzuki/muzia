@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/app/app.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
@@ -39,5 +40,18 @@ void main() {
 
     expect(find.text('読み込みエラー'), findsOneWidget);
     expect(find.text('ライブラリの読み込みに失敗しました。'), findsOneWidget);
+  });
+
+  testWidgets('検索語を入力してクリアできる', (tester) async {
+    await tester.pumpWidget(const MuziaApp());
+    await tester.pumpAndSettle();
+    final searchField = find.byKey(const ValueKey('library-search'));
+
+    await tester.enterText(searchField, 'artist');
+    await tester.pump();
+    expect(find.text('artist'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.clear));
+    await tester.pump();
+    expect(find.text('artist'), findsNothing);
   });
 }

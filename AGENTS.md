@@ -50,6 +50,21 @@ docs/features/2607311830-folder-registration/
 
 Generator-Evaluator運用の評価基準は[`docs/harness/evaluator-rubric.md`](docs/harness/evaluator-rubric.md)、スプリント契約のテンプレートは[`docs/harness/sprint-contract-template.md`](docs/harness/sprint-contract-template.md)を参照する。`spec.md`は要件、`sprint-contract.md`は観測する振る舞い、`tasks.md`は実装・テスト作業を定義する。
 
+## 課題別仕様書
+
+レビュー指摘、不具合、既存実装の是正など、新機能の追加ではない対応は、`docs/issues/`配下にディレクトリを作成する。
+
+ディレクトリ名の形式と`spec.md` / `tasks.md`の構成は`docs/features/`と同じとする。例:
+
+```text
+docs/issues/2607312326-bookmark-platform-exception/
+```
+
+`spec.md`には、事象、原因、再現手順、要件、完了条件を記載する。
+不具合とは限らないため（設計上の是正、性能改善、文書との乖離なども含む）、`## 文書情報`に`種別`を記載して区別する。
+
+対象が新機能の追加であれば`docs/features/`、既存の振る舞いの是正であれば`docs/issues/`を使う。
+
 ## デザインハンドオフ
 
 デザインハンドオフは [`docs/design_handoff/`](docs/design_handoff/) に保存する。

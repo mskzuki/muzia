@@ -1,0 +1,288 @@
+/**
+ * Radix UI Themes — Design System Tokens
+ * Source: packages/radix-ui-themes/src/styles/tokens/
+ *
+ * Usage: Include this file + @radix-ui/colors from CDN, then add
+ * class="radix-themes" data-accent-color="indigo" data-gray-color="slate"
+ * data-radius="medium" to your root element.
+ *
+ * CDN for color values:
+ *   https://unpkg.com/@radix-ui/colors@latest/<color-name>.css
+ */
+
+/* ============================================================
+   SCALING
+   ============================================================ */
+:root {
+  --scaling: 1; /* 0.9 | 0.95 | 1 | 1.05 | 1.1 */
+}
+
+/* ============================================================
+   SPACING
+   ============================================================ */
+.radix-themes {
+  --space-1: calc(4px * var(--scaling));
+  --space-2: calc(8px * var(--scaling));
+  --space-3: calc(12px * var(--scaling));
+  --space-4: calc(16px * var(--scaling));
+  --space-5: calc(24px * var(--scaling));
+  --space-6: calc(32px * var(--scaling));
+  --space-7: calc(40px * var(--scaling));
+  --space-8: calc(48px * var(--scaling));
+  --space-9: calc(64px * var(--scaling));
+}
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+.radix-themes {
+  /* Font size scale */
+  --font-size-1: calc(12px * var(--scaling));
+  --font-size-2: calc(14px * var(--scaling));
+  --font-size-3: calc(16px * var(--scaling));
+  --font-size-4: calc(18px * var(--scaling));
+  --font-size-5: calc(20px * var(--scaling));
+  --font-size-6: calc(24px * var(--scaling));
+  --font-size-7: calc(28px * var(--scaling));
+  --font-size-8: calc(35px * var(--scaling));
+  --font-size-9: calc(60px * var(--scaling));
+
+  /* Font weights */
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Line heights */
+  --line-height-1: calc(16px * var(--scaling));
+  --line-height-2: calc(20px * var(--scaling));
+  --line-height-3: calc(24px * var(--scaling));
+  --line-height-4: calc(26px * var(--scaling));
+  --line-height-5: calc(28px * var(--scaling));
+  --line-height-6: calc(30px * var(--scaling));
+  --line-height-7: calc(36px * var(--scaling));
+  --line-height-8: calc(40px * var(--scaling));
+  --line-height-9: calc(60px * var(--scaling));
+
+  /* Letter spacing — tightens at large sizes */
+  --letter-spacing-1: 0.0025em;
+  --letter-spacing-2: 0em;
+  --letter-spacing-3: 0em;
+  --letter-spacing-4: -0.0025em;
+  --letter-spacing-5: -0.005em;
+  --letter-spacing-6: -0.00625em;
+  --letter-spacing-7: -0.0075em;
+  --letter-spacing-8: -0.01em;
+  --letter-spacing-9: -0.025em;
+
+  /* Font families */
+  --default-font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI (Custom)', Roboto,
+    'Helvetica Neue', 'Open Sans (Custom)', system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --code-font-family:
+    'Menlo', 'Consolas (Custom)', 'Bitstream Vera Sans Mono', monospace,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --strong-font-family: var(--default-font-family);
+  --em-font-family: 'Times New Roman', 'Times', serif;
+  --quote-font-family: 'Times New Roman', 'Times', serif;
+  --heading-font-family: var(--default-font-family);
+
+  /* Defaults */
+  --default-font-size: var(--font-size-3);
+  --default-font-style: normal;
+  --default-font-weight: var(--font-weight-regular);
+  --default-line-height: 1.5;
+  --default-letter-spacing: 0em;
+  --default-leading-trim-start: 0.42em;
+  --default-leading-trim-end: 0.36em;
+
+  /* Heading specifics */
+  --heading-font-size-adjust: 1;
+  --heading-font-style: normal;
+  --heading-leading-trim-start: var(--default-leading-trim-start);
+  --heading-leading-trim-end: var(--default-leading-trim-end);
+  --heading-letter-spacing: 0em;
+
+  --heading-line-height-1: calc(16px * var(--scaling));
+  --heading-line-height-2: calc(18px * var(--scaling));
+  --heading-line-height-3: calc(22px * var(--scaling));
+  --heading-line-height-4: calc(24px * var(--scaling));
+  --heading-line-height-5: calc(26px * var(--scaling));
+  --heading-line-height-6: calc(30px * var(--scaling));
+  --heading-line-height-7: calc(36px * var(--scaling));
+  --heading-line-height-8: calc(40px * var(--scaling));
+  --heading-line-height-9: calc(60px * var(--scaling));
+
+  /* Code specifics */
+  --code-font-size-adjust: 0.95;
+  --code-font-style: normal;
+  --code-font-weight: inherit;
+  --code-letter-spacing: -0.007em;
+  --code-padding-top: 0.1em;
+  --code-padding-bottom: 0.1em;
+  --code-padding-left: 0.25em;
+  --code-padding-right: 0.25em;
+
+  /* Em / quote specifics */
+  --em-font-size-adjust: 1.18;
+  --em-font-style: italic;
+  --em-font-weight: inherit;
+  --em-letter-spacing: -0.025em;
+  --quote-font-size-adjust: 1.18;
+  --quote-font-style: italic;
+  --quote-font-weight: inherit;
+  --quote-letter-spacing: -0.025em;
+
+  /* Strong */
+  --strong-font-size-adjust: 1;
+  --strong-font-style: inherit;
+  --strong-font-weight: var(--font-weight-bold);
+  --strong-letter-spacing: 0em;
+}
+
+/* Apply base typography */
+.radix-themes {
+  font-family: var(--default-font-family);
+  font-size: var(--default-font-size);
+  font-weight: var(--default-font-weight);
+  font-style: var(--default-font-style);
+  line-height: var(--default-line-height);
+  letter-spacing: var(--default-letter-spacing);
+  text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: break-word;
+}
+
+/* ============================================================
+   BORDER RADIUS
+   ============================================================ */
+[data-radius] {
+  --radius-1: calc(3px * var(--scaling) * var(--radius-factor));
+  --radius-2: calc(4px * var(--scaling) * var(--radius-factor));
+  --radius-3: calc(6px * var(--scaling) * var(--radius-factor));
+  --radius-4: calc(8px * var(--scaling) * var(--radius-factor));
+  --radius-5: calc(12px * var(--scaling) * var(--radius-factor));
+  --radius-6: calc(16px * var(--scaling) * var(--radius-factor));
+}
+[data-radius='none']   { --radius-factor: 0;    --radius-full: 0px;    --radius-thumb: 0.5px; }
+[data-radius='small']  { --radius-factor: 0.75; --radius-full: 0px;    --radius-thumb: 0.5px; }
+[data-radius='medium'] { --radius-factor: 1;    --radius-full: 0px;    --radius-thumb: 9999px; }
+[data-radius='large']  { --radius-factor: 1.5;  --radius-full: 0px;    --radius-thumb: 9999px; }
+[data-radius='full']   { --radius-factor: 1.5;  --radius-full: 9999px; --radius-thumb: 9999px; }
+
+/* ============================================================
+   SHADOWS
+   ============================================================ */
+:where(.radix-themes) {
+  /* shadow-1: inset — used for text inputs */
+  --shadow-1:
+    inset 0 0 0 1px var(--gray-a5),
+    inset 0 1.5px 2px 0 var(--gray-a2),
+    inset 0 1.5px 2px 0 var(--black-a2);
+
+  /* shadow-2: subtle card */
+  --shadow-2:
+    0 0 0 1px var(--gray-a3),
+    0 0 0 0.5px var(--black-a1),
+    0 1px 1px 0 var(--gray-a2),
+    0 2px 1px -1px var(--black-a1),
+    0 1px 3px 0 var(--black-a1);
+
+  /* shadow-3: card hover / dropdown */
+  --shadow-3:
+    0 0 0 1px var(--gray-a3),
+    0 2px 3px -2px var(--gray-a3),
+    0 3px 12px -4px var(--black-a2),
+    0 4px 16px -8px var(--black-a2);
+
+  /* shadow-4: popover / tooltip */
+  --shadow-4:
+    0 0 0 1px var(--gray-a3),
+    0 8px 40px var(--black-a1),
+    0 12px 32px -16px var(--gray-a3);
+
+  /* shadow-5: dialog */
+  --shadow-5:
+    0 0 0 1px var(--gray-a3),
+    0 12px 60px var(--black-a3),
+    0 12px 32px -16px var(--gray-a5);
+
+  /* shadow-6: large modal */
+  --shadow-6:
+    0 0 0 1px var(--gray-a3),
+    0 12px 60px var(--black-a3),
+    0 16px 64px var(--gray-a2),
+    0 16px 36px -20px var(--gray-a7);
+}
+
+/* ============================================================
+   SEMANTIC COLORS (light)
+   ============================================================ */
+:where(.radix-themes) {
+  --color-background: white;
+  --color-overlay: var(--black-a6);
+  --color-panel-solid: white;
+  --color-panel-translucent: rgba(255, 255, 255, 0.7);
+  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-transparent: rgb(0 0 0 / 0);
+}
+
+/* Panel background modes */
+.radix-themes[data-panel-background='solid'] {
+  --color-panel: var(--color-panel-solid);
+  --backdrop-filter-panel: none;
+}
+.radix-themes[data-panel-background='translucent'] {
+  --color-panel: var(--color-panel-translucent);
+  --backdrop-filter-panel: blur(64px);
+}
+
+/* ============================================================
+   SEMANTIC COLORS (dark)
+   ============================================================ */
+:is(.dark, .dark-theme),
+:is(.dark, .dark-theme) :where(.radix-themes:not(.light, .light-theme)) {
+  --color-background: var(--gray-1);
+  --color-overlay: var(--black-a8);
+  --color-panel-solid: var(--gray-2);
+  --color-panel-translucent: var(--gray-a2);
+  --color-surface: rgba(0, 0, 0, 0.25);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes rt-fade-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes rt-fade-out { from { opacity: 1 } to { opacity: 0 } }
+@keyframes rt-slide-from-top    { from { transform: translateY(4px)  scale(0.97) } to { transform: none } }
+@keyframes rt-slide-from-bottom { from { transform: translateY(-4px) scale(0.97) } to { transform: none } }
+@keyframes rt-slide-from-left   { from { transform: translateX(4px)  scale(0.97) } to { transform: none } }
+@keyframes rt-slide-from-right  { from { transform: translateX(-4px) scale(0.97) } to { transform: none } }
+
+/* Open: 160ms spring. Close: 100ms. */
+/* animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1) */
+
+/* ============================================================
+   SEMANTIC ALIASES (convenience)
+   ============================================================ */
+.radix-themes {
+  /* Text */
+  --fg-primary:   var(--gray-12);  /* Main body text */
+  --fg-secondary: var(--gray-11);  /* Secondary / muted text */
+  --fg-tertiary:  var(--gray-10);  /* Placeholder / disabled */
+  --fg-accent:    var(--accent-11); /* Accent-colored text */
+  --fg-on-accent: var(--accent-contrast); /* Text on solid accent bg */
+
+  /* Borders */
+  --border-subtle:   var(--gray-a6);
+  --border-default:  var(--gray-a7);
+  --border-strong:   var(--gray-a8);
+
+  /* Interactive */
+  --interactive-accent:       var(--accent-9);
+  --interactive-accent-hover: var(--accent-10);
+  --interactive-ghost-hover:  var(--gray-a3);
+  --interactive-ghost-active: var(--gray-a4);
+}

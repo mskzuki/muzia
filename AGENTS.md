@@ -50,6 +50,19 @@ docs/features/2607311830-folder-registration/
 
 Generator-Evaluator運用の評価基準は[`docs/harness/evaluator-rubric.md`](docs/harness/evaluator-rubric.md)、スプリント契約のテンプレートは[`docs/harness/sprint-contract-template.md`](docs/harness/sprint-contract-template.md)を参照する。`spec.md`は要件、`sprint-contract.md`は観測する振る舞い、`tasks.md`は実装・テスト作業を定義する。
 
+## デザインハンドオフ
+
+デザインハンドオフは [`docs/design_handoff/`](docs/design_handoff/) に保存する。
+
+UIを実装・変更する前に、以下のデザインハンドオフ資料を確認すること。
+
+- `README.md`: デザインの対象範囲、画面構成、実装上の前提
+- `DESIGN_TOKENS.md`: 色、タイポグラフィ、余白、角丸などの共通値
+- `screenshots/`: 画面状態ごとの視覚的な受け入れ基準
+- `reference_html/`: 画面構造、インタラクション、実装参考コード
+
+機能仕様とデザインハンドオフが矛盾する場合は、独断で判断せず、対象仕様、矛盾内容、実装への影響、確認が必要な事項を作業報告に記載すること。デザインハンドオフの資料を更新する場合は、既存画面への影響を確認すること。
+
 ## 対象プラットフォーム
 
 - macOS

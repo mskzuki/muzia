@@ -18,17 +18,42 @@ class LibraryViewModel extends ChangeNotifier {
        _scanner = scanner ?? LocalFileScannerService(),
        _repository = repository ?? InMemoryMusicRepository();
 
+  LibraryViewModel.persistent({
+    FilePickerService? picker,
+    FileScannerService? scanner,
+  }) : this(
+         picker: picker,
+         scanner: scanner,
+         repository: LazyPersistentMusicRepository(),
+       );
+
   final FilePickerService _picker;
   final FileScannerService _scanner;
   final MusicRepository _repository;
   LibraryStatus _status = LibraryStatus.empty;
   List<Track> _tracks = const [];
   String? _errorMessage;
+  bool _initialized = false;
 
   LibraryStatus get status => _status;
   List<Track> get tracks => List.unmodifiable(_tracks);
   String? get registeredFolder => _repository.registeredFolder;
   String? get errorMessage => _errorMessage;
+
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    _status = LibraryStatus.loading;
+    notifyListeners();
+    try {
+      await _repository.load();
+      _tracks = _repository.tracks;
+      _status = _tracks.isEmpty ? LibraryStatus.empty : LibraryStatus.ready;
+      notifyListeners();
+    } on Object {
+      _setError('ライブラリの読み込みに失敗しました。');
+    }
+  }
 
   Future<void> chooseAndScanFolder() async {
     final selectedPath = await _picker.pickDirectory();

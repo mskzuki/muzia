@@ -28,6 +28,7 @@ class _AppShellPageState extends State<AppShellPage> {
     widget.viewModel.addListener(_onViewModelChanged);
     widget.libraryViewModel.addListener(_onViewModelChanged);
     widget.viewModel.initialize();
+    widget.libraryViewModel.initialize();
   }
 
   @override

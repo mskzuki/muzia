@@ -6,6 +6,7 @@ import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
 import 'package:muzia/features/library/domain/track.dart';
+import 'package:muzia/features/library/domain/metadata_values.dart';
 
 enum LibraryStatus { empty, loading, ready, error }
 
@@ -106,6 +107,29 @@ class LibraryViewModel extends ChangeNotifier {
       return true;
     } on Object {
       _setError('楽曲をライブラリから削除できませんでした。');
+      return false;
+    }
+  }
+
+  Future<bool> updateTrackMetadata(Track track, MetadataValues values) async {
+    return updateTracksMetadata([track], values);
+  }
+
+  Future<bool> updateTracksMetadata(
+    List<Track> tracks,
+    MetadataValues values,
+  ) async {
+    if (tracks.isEmpty) return true;
+    try {
+      await _repository.updateMetadataMany(
+        tracks.map((track) => track.filePath).toList(growable: false),
+        values,
+      );
+      _tracks = _repository.tracks;
+      notifyListeners();
+      return true;
+    } on Object {
+      _setError('メタデータを保存できませんでした。');
       return false;
     }
   }

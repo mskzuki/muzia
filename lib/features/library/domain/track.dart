@@ -1,3 +1,5 @@
+import 'package:muzia/features/library/domain/metadata_values.dart';
+
 class Track {
   const Track({
     required this.filePath,
@@ -32,6 +34,18 @@ class Track {
       album: album ?? this.album,
       releaseInfo: releaseInfo ?? this.releaseInfo,
       isRemoved: isRemoved ?? this.isRemoved,
+    );
+  }
+
+  Track replaceMetadata(MetadataValues values) {
+    return Track(
+      filePath: filePath,
+      fileExtension: fileExtension,
+      title: values.title,
+      artist: values.artist,
+      album: values.album,
+      releaseInfo: values.releaseInfo,
+      isRemoved: isRemoved,
     );
   }
 

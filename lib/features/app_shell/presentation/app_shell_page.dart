@@ -5,6 +5,8 @@ import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
 import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
 import 'package:muzia/features/library/domain/library_search.dart';
+import 'package:muzia/features/library/domain/metadata_values.dart';
+import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
 
 enum _LibrarySection { library, artistAlbum }
 
@@ -227,6 +229,9 @@ class _MainContent extends StatelessWidget {
             LibraryStatus.ready => _TrackList(
               tracks: visibleTracks,
               onRemove: libraryViewModel.removeTracks,
+              onEdit: (track, values) =>
+                  libraryViewModel.updateTrackMetadata(track, values),
+              onBulkEdit: libraryViewModel.updateTracksMetadata,
             ),
             LibraryStatus.error => _StatusMessage(
               icon: Icons.error_outline,
@@ -278,10 +283,18 @@ class _EmptyLibrary extends _StatusMessage {
 }
 
 class _TrackList extends StatefulWidget {
-  const _TrackList({required this.tracks, required this.onRemove});
+  const _TrackList({
+    required this.tracks,
+    required this.onRemove,
+    required this.onEdit,
+    required this.onBulkEdit,
+  });
 
   final List<Track> tracks;
   final Future<bool> Function(List<Track> tracks) onRemove;
+  final Future<bool> Function(Track track, MetadataValues values) onEdit;
+  final Future<bool> Function(List<Track> tracks, MetadataValues values)
+  onBulkEdit;
 
   @override
   State<_TrackList> createState() => _TrackListState();
@@ -304,6 +317,47 @@ class _TrackListState extends State<_TrackList> {
     }
   }
 
+  Future<void> _editTrack(Track track) async {
+    final values = await showDialog<MetadataValues>(
+      context: context,
+      builder: (context) => MetadataEditDialog(track: track),
+    );
+    if (values != null) await widget.onEdit(track, values);
+  }
+
+  Future<void> _bulkEdit() async {
+    final selected = widget.tracks
+        .where((track) => _selectedPaths.contains(track.filePath))
+        .toList(growable: false);
+    final values = await showDialog<MetadataValues>(
+      context: context,
+      builder: (context) => BulkMetadataEditDialog(count: selected.length),
+    );
+    if (values == null || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('次の変更を適用します'),
+        content: Text('${selected.length}曲にメタデータを適用します。\n\n元の音楽ファイルには書き込みません。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('戻る'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('適用'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true &&
+        await widget.onBulkEdit(selected, values) &&
+        mounted) {
+      setState(_selectedPaths.clear);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasSelection = _selectedPaths.isNotEmpty;
@@ -316,10 +370,22 @@ class _TrackListState extends State<_TrackList> {
             color: const Color(0x1FEDF2FE),
             child: ListTile(
               title: Text('${_selectedPaths.length}曲を選択中'),
-              trailing: FilledButton.icon(
-                onPressed: _confirmRemove,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('ライブラリから削除'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_selectedPaths.length >= 2)
+                    FilledButton.icon(
+                      onPressed: _bulkEdit,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('一括編集'),
+                    ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _confirmRemove,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('削除'),
+                  ),
+                ],
               ),
             ),
           );
@@ -341,6 +407,11 @@ class _TrackListState extends State<_TrackList> {
           ),
           subtitle: Text(
             '${track.artist ?? 'アーティスト不明'} · ${track.album ?? 'アルバム不明'}',
+          ),
+          trailing: IconButton(
+            tooltip: '曲を編集',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => _editTrack(track),
           ),
         );
       },

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/library_database.dart' hide Track;
 import 'package:muzia/features/library/data/music_repository.dart';
 import 'package:muzia/features/library/domain/track.dart';
+import 'package:muzia/features/library/domain/metadata_values.dart';
 
 void main() {
   test('登録フォルダと楽曲メタデータを保存して復元する', () async {
@@ -19,7 +20,15 @@ void main() {
     );
 
     await repository.registerFolder('/tmp/music', const [track]);
-    await repository.updateMetadata('/tmp/song.mp3', title: 'Edited song');
+    await repository.updateMetadata(
+      '/tmp/song.mp3',
+      values: const MetadataValues(
+        title: 'Edited song',
+        artist: 'Artist',
+        album: 'Album',
+        releaseInfo: '2024',
+      ),
+    );
     await repository.markRemoved('/tmp/song.mp3', true);
     final restored = PersistentMusicRepository(database);
     await restored.load();
@@ -59,5 +68,38 @@ void main() {
 
     expect(restored.tracks, hasLength(2));
     expect(restored.tracks.every((track) => track.isRemoved), isTrue);
+  });
+
+  test('複数楽曲のメタデータを同一更新として保存する', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    const first = Track(
+      filePath: '/tmp/one.mp3',
+      fileExtension: '.mp3',
+      title: 'One',
+    );
+    const second = Track(
+      filePath: '/tmp/two.mp3',
+      fileExtension: '.mp3',
+      title: 'Two',
+    );
+
+    await repository.registerFolder('/tmp/music', const [first, second]);
+    await repository.updateMetadataMany([
+      first.filePath,
+      second.filePath,
+    ], const MetadataValues(artist: 'Shared artist', album: 'Shared album'));
+    final restored = PersistentMusicRepository(database);
+    await restored.load();
+
+    expect(restored.tracks.map((track) => track.artist), [
+      'Shared artist',
+      'Shared artist',
+    ]);
+    expect(restored.tracks.map((track) => track.album), [
+      'Shared album',
+      'Shared album',
+    ]);
   });
 }

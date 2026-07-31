@@ -1,4 +1,5 @@
 import 'package:muzia/features/library/domain/track.dart';
+import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -14,11 +15,12 @@ abstract interface class MusicRepository {
   Future<void> registerFolder(String path, List<Track> tracks);
   Future<void> updateMetadata(
     String filePath, {
-    String? title,
-    String? artist,
-    String? album,
-    String? releaseInfo,
+    required MetadataValues values,
   });
+  Future<void> updateMetadataMany(
+    List<String> filePaths,
+    MetadataValues values,
+  );
   Future<void> markRemoved(String filePath, bool removed);
   Future<void> markRemovedMany(List<String> filePaths, bool removed);
 }
@@ -45,20 +47,18 @@ class InMemoryMusicRepository implements MusicRepository {
   @override
   Future<void> updateMetadata(
     String filePath, {
-    String? title,
-    String? artist,
-    String? album,
-    String? releaseInfo,
-  }) async {
+    required MetadataValues values,
+  }) async => updateMetadataMany([filePath], values);
+
+  @override
+  Future<void> updateMetadataMany(
+    List<String> filePaths,
+    MetadataValues values,
+  ) async {
     _tracks = _tracks
         .map(
-          (track) => track.filePath == filePath
-              ? track.copyWith(
-                  title: title,
-                  artist: artist,
-                  album: album,
-                  releaseInfo: releaseInfo,
-                )
+          (track) => filePaths.contains(track.filePath)
+              ? track.replaceMetadata(values)
               : track,
         )
         .toList(growable: false);
@@ -192,26 +192,33 @@ class PersistentMusicRepository implements MusicRepository {
   @override
   Future<void> updateMetadata(
     String filePath, {
-    String? title,
-    String? artist,
-    String? album,
-    String? releaseInfo,
-  }) async {
-    final row = await (_database.select(
-      _database.tracks,
-    )..where((table) => table.filePath.equals(filePath))).getSingle();
+    required MetadataValues values,
+  }) async => updateMetadataMany([filePath], values);
+
+  @override
+  Future<void> updateMetadataMany(
+    List<String> filePaths,
+    MetadataValues values,
+  ) async {
     final now = DateTime.now().toUtc();
-    await (_database.update(
-      _database.trackMetadata,
-    )..where((table) => table.trackId.equals(row.id))).write(
-      TrackMetadataCompanion(
-        title: Value(title),
-        artist: Value(artist),
-        album: Value(album),
-        releaseInfo: Value(releaseInfo),
-        updatedAt: Value(now),
-      ),
-    );
+    await _database.transaction(() async {
+      for (final filePath in filePaths) {
+        final row = await (_database.select(
+          _database.tracks,
+        )..where((table) => table.filePath.equals(filePath))).getSingle();
+        await (_database.update(
+          _database.trackMetadata,
+        )..where((table) => table.trackId.equals(row.id))).write(
+          TrackMetadataCompanion(
+            title: Value(values.title),
+            artist: Value(values.artist),
+            album: Value(values.album),
+            releaseInfo: Value(values.releaseInfo),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+    });
     await load();
   }
 
@@ -262,17 +269,14 @@ class LazyPersistentMusicRepository implements MusicRepository {
   @override
   Future<void> updateMetadata(
     String filePath, {
-    String? title,
-    String? artist,
-    String? album,
-    String? releaseInfo,
-  }) async => (await _open()).updateMetadata(
-    filePath,
-    title: title,
-    artist: artist,
-    album: album,
-    releaseInfo: releaseInfo,
-  );
+    required MetadataValues values,
+  }) async => (await _open()).updateMetadata(filePath, values: values);
+
+  @override
+  Future<void> updateMetadataMany(
+    List<String> filePaths,
+    MetadataValues values,
+  ) async => (await _open()).updateMetadataMany(filePaths, values);
 
   @override
   Future<void> markRemoved(String filePath, bool removed) async =>

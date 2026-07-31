@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
+import 'package:muzia/features/library/presentation/artist_album_browser.dart';
+
+enum _LibrarySection { library, artistAlbum }
 
 class AppShellPage extends StatefulWidget {
   const AppShellPage({
@@ -18,6 +21,7 @@ class AppShellPage extends StatefulWidget {
 }
 
 class _AppShellPageState extends State<AppShellPage> {
+  _LibrarySection _section = _LibrarySection.library;
   @override
   void initState() {
     super.initState();
@@ -48,11 +52,15 @@ class _AppShellPageState extends State<AppShellPage> {
               children: [
                 _Sidebar(
                   onPickFolder: widget.libraryViewModel.chooseAndScanFolder,
+                  section: _section,
+                  onSectionChanged: (section) =>
+                      setState(() => _section = section),
                 ),
                 Expanded(
                   child: _MainContent(
                     viewModel: widget.viewModel,
                     libraryViewModel: widget.libraryViewModel,
+                    section: _section,
                   ),
                 ),
               ],
@@ -66,9 +74,15 @@ class _AppShellPageState extends State<AppShellPage> {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.onPickFolder});
+  const _Sidebar({
+    required this.onPickFolder,
+    required this.section,
+    required this.onSectionChanged,
+  });
 
   final VoidCallback onPickFolder;
+  final _LibrarySection section;
+  final ValueChanged<_LibrarySection> onSectionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +99,18 @@ class _Sidebar extends StatelessWidget {
                 'ライブラリ',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('楽曲'),
+                selected: section == _LibrarySection.library,
+                onTap: () => onSectionChanged(_LibrarySection.library),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('アーティスト / アルバム'),
+                selected: section == _LibrarySection.artistAlbum,
+                onTap: () => onSectionChanged(_LibrarySection.artistAlbum),
+              ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onPickFolder,
@@ -100,13 +126,25 @@ class _Sidebar extends StatelessWidget {
 }
 
 class _MainContent extends StatelessWidget {
-  const _MainContent({required this.viewModel, required this.libraryViewModel});
+  const _MainContent({
+    required this.viewModel,
+    required this.libraryViewModel,
+    required this.section,
+  });
 
   final AppShellViewModel viewModel;
   final LibraryViewModel libraryViewModel;
+  final _LibrarySection section;
 
   @override
   Widget build(BuildContext context) {
+    if (section == _LibrarySection.artistAlbum &&
+        libraryViewModel.status == LibraryStatus.ready) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),
+      );
+    }
     final content = viewModel.status == AppShellStatus.loading
         ? const _StatusMessage(
             icon: Icons.hourglass_top,

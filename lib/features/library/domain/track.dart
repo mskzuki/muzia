@@ -6,6 +6,7 @@ class Track {
     this.artist,
     this.album,
     this.releaseInfo,
+    this.isRemoved = false,
   });
 
   final String filePath;
@@ -14,4 +15,5 @@ class Track {
   final String? artist;
   final String? album;
   final String? releaseInfo;
+  final bool isRemoved;
 }

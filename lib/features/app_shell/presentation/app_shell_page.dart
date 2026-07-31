@@ -198,7 +198,8 @@ class _MainContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (section == _LibrarySection.artistAlbum &&
-        libraryViewModel.status == LibraryStatus.ready) {
+        (libraryViewModel.status == LibraryStatus.ready ||
+            libraryViewModel.status == LibraryStatus.readyWithWarnings)) {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),
@@ -236,6 +237,16 @@ class _MainContent extends StatelessWidget {
               ),
             LibraryStatus.ready => _TrackList(
               tracks: visibleTracks,
+              warningMessage: null,
+              onRemove: libraryViewModel.removeTracks,
+              onEdit: (track, values) =>
+                  libraryViewModel.updateTrackMetadata(track, values),
+              onBulkEdit: libraryViewModel.updateTracksMetadata,
+              onPlay: onPlay,
+            ),
+            LibraryStatus.readyWithWarnings => _TrackList(
+              tracks: visibleTracks,
+              warningMessage: libraryViewModel.warningMessage,
               onRemove: libraryViewModel.removeTracks,
               onEdit: (track, values) =>
                   libraryViewModel.updateTrackMetadata(track, values),
@@ -294,6 +305,7 @@ class _EmptyLibrary extends _StatusMessage {
 class _TrackList extends StatefulWidget {
   const _TrackList({
     required this.tracks,
+    required this.warningMessage,
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
@@ -301,6 +313,7 @@ class _TrackList extends StatefulWidget {
   });
 
   final List<Track> tracks;
+  final String? warningMessage;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
@@ -342,14 +355,26 @@ class _TrackListState extends State<_TrackList> {
         .toList(growable: false);
     final values = await showDialog<MetadataValues>(
       context: context,
-      builder: (context) => BulkMetadataEditDialog(count: selected.length),
+      builder: (context) => BulkMetadataEditDialog(tracks: selected),
     );
     if (values == null || !mounted) return;
+    // REQ-004: 件数だけでなく、実際に書き込む項目と値を確認できるようにする。
+    final changes = bulkEditableFields
+        .where(values.changes)
+        .map(
+          (field) =>
+              '・${bulkFieldLabel(field)}: ${values.valueOf(field) ?? '（空欄にする）'}',
+        )
+        .join('\n');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('次の変更を適用します'),
-        content: Text('${selected.length}曲にメタデータを適用します。\n\n元の音楽ファイルには書き込みません。'),
+        content: Text(
+          '${selected.length}曲に以下を適用します。\n\n'
+          '$changes\n\n'
+          '変更しない項目と元の音楽ファイルには書き込みません。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -372,11 +397,21 @@ class _TrackListState extends State<_TrackList> {
   @override
   Widget build(BuildContext context) {
     final hasSelection = _selectedPaths.isNotEmpty;
+    final hasWarning = widget.warningMessage != null;
+    final noticeOffset = hasWarning ? 1 : 0;
     return ListView.separated(
-      itemCount: widget.tracks.length + (hasSelection ? 1 : 0),
+      itemCount: widget.tracks.length + noticeOffset + (hasSelection ? 1 : 0),
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        if (hasSelection && index == 0) {
+        if (hasWarning && index == 0) {
+          return ListTile(
+            leading: const Icon(Icons.warning_amber_outlined),
+            title: const Text('一部のファイルを読み込めませんでした'),
+            subtitle: Text(widget.warningMessage!),
+          );
+        }
+        final adjustedIndex = index - noticeOffset;
+        if (hasSelection && adjustedIndex == 0) {
           return Material(
             color: const Color(0x1FEDF2FE),
             child: ListTile(
@@ -401,7 +436,8 @@ class _TrackListState extends State<_TrackList> {
             ),
           );
         }
-        final track = widget.tracks[hasSelection ? index - 1 : index];
+        final track =
+            widget.tracks[hasSelection ? adjustedIndex - 1 : adjustedIndex];
         return ListTile(
           leading: Checkbox(
             value: _selectedPaths.contains(track.filePath),

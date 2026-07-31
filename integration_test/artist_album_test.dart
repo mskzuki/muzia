@@ -10,14 +10,17 @@ import 'package:muzia/features/library/presentation/library_view_model.dart';
 
 class _FakeScanner implements FileScannerService {
   @override
-  Stream<Track> scan(String directoryPath) async* {
-    yield const Track(
-      filePath: 'one.mp3',
-      fileExtension: '.mp3',
-      title: 'One',
-      artist: 'Beta',
-      album: 'B',
+  Stream<ScanEvent> scan(String directoryPath) async* {
+    yield const TrackFound(
+      Track(
+        filePath: 'one.mp3',
+        fileExtension: '.mp3',
+        title: 'One',
+        artist: 'Beta',
+        album: 'B',
+      ),
     );
+    yield ScanCompleted(candidateCount: 1, foundCount: 1);
   }
 }
 

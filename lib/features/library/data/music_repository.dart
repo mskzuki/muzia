@@ -142,6 +142,7 @@ class PersistentMusicRepository implements MusicRepository {
   Future<void> registerFolder(String path, List<Track> tracks) async {
     final now = DateTime.now().toUtc();
     await _database.transaction(() async {
+      await _database.delete(_database.trackSourceMetadata).go();
       await _database.delete(_database.tracks).go();
       await (_database.update(
         _database.libraryFolders,
@@ -183,6 +184,18 @@ class PersistentMusicRepository implements MusicRepository {
                 updatedAt: now,
               ),
             );
+        await _database
+            .into(_database.trackSourceMetadata)
+            .insert(
+              TrackSourceMetadataCompanion.insert(
+                trackId: Value(trackId),
+                title: Value(track.title),
+                artist: Value(track.artist),
+                album: Value(track.album),
+                releaseInfo: Value(track.releaseInfo),
+                readAt: now,
+              ),
+            );
       }
     });
     _registeredFolder = path;
@@ -210,10 +223,10 @@ class PersistentMusicRepository implements MusicRepository {
           _database.trackMetadata,
         )..where((table) => table.trackId.equals(row.id))).write(
           TrackMetadataCompanion(
-            title: Value(values.title),
-            artist: Value(values.artist),
-            album: Value(values.album),
-            releaseInfo: Value(values.releaseInfo),
+            title: _column(values, MetadataField.title),
+            artist: _column(values, MetadataField.artist),
+            album: _column(values, MetadataField.album),
+            releaseInfo: _column(values, MetadataField.releaseInfo),
             updatedAt: Value(now),
           ),
         );
@@ -245,6 +258,11 @@ class PersistentMusicRepository implements MusicRepository {
     await load();
   }
 }
+
+/// 更新対象の項目だけを `UPDATE` に含める。対象外は [Value.absent] とし、
+/// 既存の値をそのまま残す。
+Value<String?> _column(MetadataValues values, MetadataField field) =>
+    values.changes(field) ? Value(values.valueOf(field)) : const Value.absent();
 
 class LazyPersistentMusicRepository implements MusicRepository {
   PersistentMusicRepository? _delegate;

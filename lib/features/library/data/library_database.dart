@@ -33,14 +33,32 @@ class TrackMetadata extends Table {
   Set<Column<Object>> get primaryKey => {trackId};
 }
 
-@DriftDatabase(tables: [LibraryFolders, Tracks, TrackMetadata])
+class TrackSourceMetadata extends Table {
+  IntColumn get trackId => integer()();
+  TextColumn get title => text().nullable()();
+  TextColumn get artist => text().nullable()();
+  TextColumn get album => text().nullable()();
+  TextColumn get releaseInfo => text().nullable()();
+  DateTimeColumn get readAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {trackId};
+}
+
+@DriftDatabase(
+  tables: [LibraryFolders, Tracks, TrackMetadata, TrackSourceMetadata],
+)
 class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
-  MigrationStrategy get migration =>
-      MigrationStrategy(onCreate: (m) => m.createAll());
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) await m.createTable(trackSourceMetadata);
+    },
+  );
 }

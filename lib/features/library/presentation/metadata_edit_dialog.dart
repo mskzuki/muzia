@@ -35,14 +35,27 @@ class _MetadataEditDialogState extends State<MetadataEditDialog> {
     super.dispose();
   }
 
+  String? _titleError;
+
+  /// 空欄は `null` として保存する。`''` と `null` が混在すると、
+  /// アーティスト一覧の除外条件と楽曲一覧の代替表示がずれるため。
+  static String? _normalize(TextEditingController controller) {
+    final text = controller.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
   void _save() {
-    if (_title.text.trim().isEmpty) return;
+    final title = _normalize(_title);
+    if (title == null) {
+      setState(() => _titleError = '曲名を入力してください。');
+      return;
+    }
     Navigator.of(context).pop(
       MetadataValues(
-        title: _title.text.trim(),
-        artist: _artist.text.trim(),
-        album: _album.text.trim(),
-        releaseInfo: _releaseInfo.text.trim(),
+        title: title,
+        artist: _normalize(_artist),
+        album: _normalize(_album),
+        releaseInfo: _normalize(_releaseInfo),
       ),
     );
   }
@@ -57,7 +70,13 @@ class _MetadataEditDialogState extends State<MetadataEditDialog> {
           children: [
             TextField(
               controller: _title,
-              decoration: const InputDecoration(labelText: '曲名'),
+              onChanged: (_) {
+                if (_titleError != null) setState(() => _titleError = null);
+              },
+              decoration: InputDecoration(
+                labelText: '曲名',
+                errorText: _titleError,
+              ),
             ),
             TextField(
               controller: _artist,
@@ -85,26 +104,78 @@ class _MetadataEditDialogState extends State<MetadataEditDialog> {
   }
 }
 
-class BulkMetadataEditDialog extends StatefulWidget {
-  const BulkMetadataEditDialog({super.key, required this.count});
+/// 一括編集で対象にできる項目。曲名は楽曲ごとに固有のため含めない。
+const bulkEditableFields = <MetadataField>[
+  MetadataField.artist,
+  MetadataField.album,
+  MetadataField.releaseInfo,
+];
 
-  final int count;
+const _bulkFieldLabels = <MetadataField, String>{
+  MetadataField.artist: 'アーティスト',
+  MetadataField.album: 'アルバム名',
+  MetadataField.releaseInfo: 'リリース年',
+};
+
+/// 一括編集の確認表示で使う項目名。
+String bulkFieldLabel(MetadataField field) => _bulkFieldLabels[field]!;
+
+class BulkMetadataEditDialog extends StatefulWidget {
+  const BulkMetadataEditDialog({super.key, required this.tracks});
+
+  final List<Track> tracks;
 
   @override
   State<BulkMetadataEditDialog> createState() => _BulkMetadataEditDialogState();
 }
 
 class _BulkMetadataEditDialogState extends State<BulkMetadataEditDialog> {
-  final _artist = TextEditingController();
-  final _album = TextEditingController();
-  final _releaseInfo = TextEditingController();
+  late final Map<MetadataField, TextEditingController> _controllers;
+  final Set<MetadataField> _targetFields = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = {
+      for (final field in bulkEditableFields)
+        field: TextEditingController(text: _sharedValue(field) ?? ''),
+    };
+  }
+
+  /// 選択した全楽曲で値が一致する場合だけ、その値を初期表示する。
+  /// 値が混在する場合は空欄にし、チェックするまで書き込まない。
+  String? _sharedValue(MetadataField field) =>
+      _hasSharedValue(field) ? widget.tracks.first.valueOf(field) : null;
+
+  /// 全楽曲で値が一致するか。全曲が未設定（null）の場合も「一致」とする。
+  /// これを [_sharedValue] の戻り値で判定すると、
+  /// 「全曲が未設定」と「値が混在」を区別できない。
+  bool _hasSharedValue(MetadataField field) =>
+      widget.tracks.map((track) => track.valueOf(field)).toSet().length <= 1;
 
   @override
   void dispose() {
-    _artist.dispose();
-    _album.dispose();
-    _releaseInfo.dispose();
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _save() {
+    String? valueFor(MetadataField field) {
+      if (!_targetFields.contains(field)) return null;
+      final text = _controllers[field]!.text.trim();
+      return text.isEmpty ? null : text;
+    }
+
+    Navigator.of(context).pop(
+      MetadataValues.partial(
+        fields: Set.unmodifiable(_targetFields),
+        artist: valueFor(MetadataField.artist),
+        album: valueFor(MetadataField.album),
+        releaseInfo: valueFor(MetadataField.releaseInfo),
+      ),
+    );
   }
 
   @override
@@ -117,23 +188,38 @@ class _BulkMetadataEditDialogState extends State<BulkMetadataEditDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${widget.count}曲を選択中',
+              '${widget.tracks.length}曲を選択中',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             const SizedBox(height: 12),
             const Text('曲名とトラック番号は、重複を避けるため一括編集できません。'),
-            TextField(
-              controller: _artist,
-              decoration: const InputDecoration(labelText: 'アーティスト'),
-            ),
-            TextField(
-              controller: _album,
-              decoration: const InputDecoration(labelText: 'アルバム名'),
-            ),
-            TextField(
-              controller: _releaseInfo,
-              decoration: const InputDecoration(labelText: 'リリース年'),
-            ),
+            const SizedBox(height: 4),
+            const Text('チェックした項目だけを変更します。'),
+            for (final field in bulkEditableFields) ...[
+              CheckboxListTile(
+                key: ValueKey('bulk-target-${field.name}'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                value: _targetFields.contains(field),
+                title: Text('${_bulkFieldLabels[field]}を変更する'),
+                onChanged: (selected) => setState(() {
+                  if (selected == true) {
+                    _targetFields.add(field);
+                  } else {
+                    _targetFields.remove(field);
+                  }
+                }),
+              ),
+              TextField(
+                controller: _controllers[field],
+                enabled: _targetFields.contains(field),
+                decoration: InputDecoration(
+                  labelText: _bulkFieldLabels[field],
+                  hintText: _hasSharedValue(field) ? null : '複数の値',
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -143,13 +229,7 @@ class _BulkMetadataEditDialogState extends State<BulkMetadataEditDialog> {
           child: const Text('キャンセル'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(
-            MetadataValues(
-              artist: _artist.text.trim(),
-              album: _album.text.trim(),
-              releaseInfo: _releaseInfo.text.trim(),
-            ),
-          ),
+          onPressed: _targetFields.isEmpty ? null : _save,
           child: const Text('保存'),
         ),
       ],

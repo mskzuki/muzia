@@ -4,6 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- ユーザーが選択した音楽フォルダを読み取るために必要。
+	     アプリは音楽ファイルを変更しないため read-write は付与しない（FR-014）。 -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>

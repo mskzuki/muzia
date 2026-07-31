@@ -5,8 +5,7 @@ import 'package:muzia/features/playback/domain/audio_player_service.dart';
 enum PlaybackStatus { idle, loading, playing, paused, error }
 
 class PlayerViewModel extends ChangeNotifier {
-  PlayerViewModel({AudioPlayerService? service})
-    : _service = service ?? MediaKitAudioPlayerService();
+  PlayerViewModel({required this._service});
   final AudioPlayerService _service;
   PlaybackStatus _status = PlaybackStatus.idle;
   Track? _track;

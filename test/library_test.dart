@@ -21,10 +21,14 @@ class _FakeScanner implements FileScannerService {
   final List<Track> tracks;
 
   @override
-  Stream<Track> scan(String directoryPath) async* {
+  Stream<ScanEvent> scan(String directoryPath) async* {
     for (final track in tracks) {
-      yield track;
+      yield TrackFound(track);
     }
+    yield ScanCompleted(
+      candidateCount: tracks.length,
+      foundCount: tracks.length,
+    );
   }
 }
 
@@ -80,4 +84,83 @@ void main() {
     expect(viewModel.status, LibraryStatus.error);
     expect(viewModel.errorMessage, 'このフォルダはすでに登録されています。');
   });
+
+  test('解析エラーを空フォルダと区別する', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = InMemoryMusicRepository();
+    final viewModel = LibraryViewModel(
+      scanner: _IssueScanner(),
+      repository: repository,
+    );
+
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, '音楽ファイルのメタデータを解析できませんでした。');
+  });
+
+  test('一部の解析エラーは楽曲を表示しながら警告する', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = InMemoryMusicRepository();
+    final viewModel = LibraryViewModel(
+      scanner: _PartialIssueScanner(),
+      repository: repository,
+    );
+
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.readyWithWarnings);
+    expect(viewModel.tracks, hasLength(1));
+    expect(viewModel.warningMessage, '1件の音楽ファイルを解析できませんでした。');
+  });
+
+  test('フォルダアクセスエラーを分類する', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = InMemoryMusicRepository();
+    final viewModel = LibraryViewModel(
+      scanner: _AccessErrorScanner(),
+      repository: repository,
+    );
+
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
+  });
+}
+
+class _IssueScanner implements FileScannerService {
+  @override
+  Stream<ScanEvent> scan(String directoryPath) async* {
+    yield ScanIssueEvent(kind: ScanIssueKind.metadata, filePath: 'broken.mp3');
+    yield ScanCompleted(candidateCount: 1, foundCount: 0);
+  }
+}
+
+class _PartialIssueScanner implements FileScannerService {
+  @override
+  Stream<ScanEvent> scan(String directoryPath) async* {
+    yield const TrackFound(Track(filePath: 'valid.mp3', fileExtension: '.mp3'));
+    yield ScanIssueEvent(kind: ScanIssueKind.metadata, filePath: 'broken.mp3');
+    yield ScanCompleted(candidateCount: 2, foundCount: 1);
+  }
+}
+
+class _AccessErrorScanner implements FileScannerService {
+  @override
+  Stream<ScanEvent> scan(String directoryPath) async* {
+    throw FolderAccessException(
+      const FileSystemException('permission denied'),
+      StackTrace.current,
+    );
+  }
 }

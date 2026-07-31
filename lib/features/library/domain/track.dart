@@ -37,14 +37,25 @@ class Track {
     );
   }
 
+  String? valueOf(MetadataField field) => switch (field) {
+    MetadataField.title => title,
+    MetadataField.artist => artist,
+    MetadataField.album => album,
+    MetadataField.releaseInfo => releaseInfo,
+  };
+
+  /// [values] が更新対象とした項目だけを差し替える。
+  /// 対象外の項目は現在値を保持する。
   Track replaceMetadata(MetadataValues values) {
     return Track(
       filePath: filePath,
       fileExtension: fileExtension,
-      title: values.title,
-      artist: values.artist,
-      album: values.album,
-      releaseInfo: values.releaseInfo,
+      title: values.changes(MetadataField.title) ? values.title : title,
+      artist: values.changes(MetadataField.artist) ? values.artist : artist,
+      album: values.changes(MetadataField.album) ? values.album : album,
+      releaseInfo: values.changes(MetadataField.releaseInfo)
+          ? values.releaseInfo
+          : releaseInfo,
       isRemoved: isRemoved,
     );
   }

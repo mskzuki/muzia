@@ -1282,12 +1282,421 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
   }
 }
 
+class $TrackSourceMetadataTable extends TrackSourceMetadata
+    with TableInfo<$TrackSourceMetadataTable, TrackSourceMetadataData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TrackSourceMetadataTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _trackIdMeta = const VerificationMeta(
+    'trackId',
+  );
+  @override
+  late final GeneratedColumn<int> trackId = GeneratedColumn<int>(
+    'track_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _artistMeta = const VerificationMeta('artist');
+  @override
+  late final GeneratedColumn<String> artist = GeneratedColumn<String>(
+    'artist',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _albumMeta = const VerificationMeta('album');
+  @override
+  late final GeneratedColumn<String> album = GeneratedColumn<String>(
+    'album',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _releaseInfoMeta = const VerificationMeta(
+    'releaseInfo',
+  );
+  @override
+  late final GeneratedColumn<String> releaseInfo = GeneratedColumn<String>(
+    'release_info',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _readAtMeta = const VerificationMeta('readAt');
+  @override
+  late final GeneratedColumn<DateTime> readAt = GeneratedColumn<DateTime>(
+    'read_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    trackId,
+    title,
+    artist,
+    album,
+    releaseInfo,
+    readAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'track_source_metadata';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TrackSourceMetadataData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('track_id')) {
+      context.handle(
+        _trackIdMeta,
+        trackId.isAcceptableOrUnknown(data['track_id']!, _trackIdMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('artist')) {
+      context.handle(
+        _artistMeta,
+        artist.isAcceptableOrUnknown(data['artist']!, _artistMeta),
+      );
+    }
+    if (data.containsKey('album')) {
+      context.handle(
+        _albumMeta,
+        album.isAcceptableOrUnknown(data['album']!, _albumMeta),
+      );
+    }
+    if (data.containsKey('release_info')) {
+      context.handle(
+        _releaseInfoMeta,
+        releaseInfo.isAcceptableOrUnknown(
+          data['release_info']!,
+          _releaseInfoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('read_at')) {
+      context.handle(
+        _readAtMeta,
+        readAt.isAcceptableOrUnknown(data['read_at']!, _readAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_readAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {trackId};
+  @override
+  TrackSourceMetadataData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TrackSourceMetadataData(
+      trackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      artist: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}artist'],
+      ),
+      album: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}album'],
+      ),
+      releaseInfo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}release_info'],
+      ),
+      readAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}read_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TrackSourceMetadataTable createAlias(String alias) {
+    return $TrackSourceMetadataTable(attachedDatabase, alias);
+  }
+}
+
+class TrackSourceMetadataData extends DataClass
+    implements Insertable<TrackSourceMetadataData> {
+  final int trackId;
+  final String? title;
+  final String? artist;
+  final String? album;
+  final String? releaseInfo;
+  final DateTime readAt;
+  const TrackSourceMetadataData({
+    required this.trackId,
+    this.title,
+    this.artist,
+    this.album,
+    this.releaseInfo,
+    required this.readAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['track_id'] = Variable<int>(trackId);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || artist != null) {
+      map['artist'] = Variable<String>(artist);
+    }
+    if (!nullToAbsent || album != null) {
+      map['album'] = Variable<String>(album);
+    }
+    if (!nullToAbsent || releaseInfo != null) {
+      map['release_info'] = Variable<String>(releaseInfo);
+    }
+    map['read_at'] = Variable<DateTime>(readAt);
+    return map;
+  }
+
+  TrackSourceMetadataCompanion toCompanion(bool nullToAbsent) {
+    return TrackSourceMetadataCompanion(
+      trackId: Value(trackId),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      artist: artist == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artist),
+      album: album == null && nullToAbsent
+          ? const Value.absent()
+          : Value(album),
+      releaseInfo: releaseInfo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releaseInfo),
+      readAt: Value(readAt),
+    );
+  }
+
+  factory TrackSourceMetadataData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TrackSourceMetadataData(
+      trackId: serializer.fromJson<int>(json['trackId']),
+      title: serializer.fromJson<String?>(json['title']),
+      artist: serializer.fromJson<String?>(json['artist']),
+      album: serializer.fromJson<String?>(json['album']),
+      releaseInfo: serializer.fromJson<String?>(json['releaseInfo']),
+      readAt: serializer.fromJson<DateTime>(json['readAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'trackId': serializer.toJson<int>(trackId),
+      'title': serializer.toJson<String?>(title),
+      'artist': serializer.toJson<String?>(artist),
+      'album': serializer.toJson<String?>(album),
+      'releaseInfo': serializer.toJson<String?>(releaseInfo),
+      'readAt': serializer.toJson<DateTime>(readAt),
+    };
+  }
+
+  TrackSourceMetadataData copyWith({
+    int? trackId,
+    Value<String?> title = const Value.absent(),
+    Value<String?> artist = const Value.absent(),
+    Value<String?> album = const Value.absent(),
+    Value<String?> releaseInfo = const Value.absent(),
+    DateTime? readAt,
+  }) => TrackSourceMetadataData(
+    trackId: trackId ?? this.trackId,
+    title: title.present ? title.value : this.title,
+    artist: artist.present ? artist.value : this.artist,
+    album: album.present ? album.value : this.album,
+    releaseInfo: releaseInfo.present ? releaseInfo.value : this.releaseInfo,
+    readAt: readAt ?? this.readAt,
+  );
+  TrackSourceMetadataData copyWithCompanion(TrackSourceMetadataCompanion data) {
+    return TrackSourceMetadataData(
+      trackId: data.trackId.present ? data.trackId.value : this.trackId,
+      title: data.title.present ? data.title.value : this.title,
+      artist: data.artist.present ? data.artist.value : this.artist,
+      album: data.album.present ? data.album.value : this.album,
+      releaseInfo: data.releaseInfo.present
+          ? data.releaseInfo.value
+          : this.releaseInfo,
+      readAt: data.readAt.present ? data.readAt.value : this.readAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TrackSourceMetadataData(')
+          ..write('trackId: $trackId, ')
+          ..write('title: $title, ')
+          ..write('artist: $artist, ')
+          ..write('album: $album, ')
+          ..write('releaseInfo: $releaseInfo, ')
+          ..write('readAt: $readAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(trackId, title, artist, album, releaseInfo, readAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TrackSourceMetadataData &&
+          other.trackId == this.trackId &&
+          other.title == this.title &&
+          other.artist == this.artist &&
+          other.album == this.album &&
+          other.releaseInfo == this.releaseInfo &&
+          other.readAt == this.readAt);
+}
+
+class TrackSourceMetadataCompanion
+    extends UpdateCompanion<TrackSourceMetadataData> {
+  final Value<int> trackId;
+  final Value<String?> title;
+  final Value<String?> artist;
+  final Value<String?> album;
+  final Value<String?> releaseInfo;
+  final Value<DateTime> readAt;
+  const TrackSourceMetadataCompanion({
+    this.trackId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.artist = const Value.absent(),
+    this.album = const Value.absent(),
+    this.releaseInfo = const Value.absent(),
+    this.readAt = const Value.absent(),
+  });
+  TrackSourceMetadataCompanion.insert({
+    this.trackId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.artist = const Value.absent(),
+    this.album = const Value.absent(),
+    this.releaseInfo = const Value.absent(),
+    required DateTime readAt,
+  }) : readAt = Value(readAt);
+  static Insertable<TrackSourceMetadataData> custom({
+    Expression<int>? trackId,
+    Expression<String>? title,
+    Expression<String>? artist,
+    Expression<String>? album,
+    Expression<String>? releaseInfo,
+    Expression<DateTime>? readAt,
+  }) {
+    return RawValuesInsertable({
+      if (trackId != null) 'track_id': trackId,
+      if (title != null) 'title': title,
+      if (artist != null) 'artist': artist,
+      if (album != null) 'album': album,
+      if (releaseInfo != null) 'release_info': releaseInfo,
+      if (readAt != null) 'read_at': readAt,
+    });
+  }
+
+  TrackSourceMetadataCompanion copyWith({
+    Value<int>? trackId,
+    Value<String?>? title,
+    Value<String?>? artist,
+    Value<String?>? album,
+    Value<String?>? releaseInfo,
+    Value<DateTime>? readAt,
+  }) {
+    return TrackSourceMetadataCompanion(
+      trackId: trackId ?? this.trackId,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      album: album ?? this.album,
+      releaseInfo: releaseInfo ?? this.releaseInfo,
+      readAt: readAt ?? this.readAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (trackId.present) {
+      map['track_id'] = Variable<int>(trackId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (artist.present) {
+      map['artist'] = Variable<String>(artist.value);
+    }
+    if (album.present) {
+      map['album'] = Variable<String>(album.value);
+    }
+    if (releaseInfo.present) {
+      map['release_info'] = Variable<String>(releaseInfo.value);
+    }
+    if (readAt.present) {
+      map['read_at'] = Variable<DateTime>(readAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TrackSourceMetadataCompanion(')
+          ..write('trackId: $trackId, ')
+          ..write('title: $title, ')
+          ..write('artist: $artist, ')
+          ..write('album: $album, ')
+          ..write('releaseInfo: $releaseInfo, ')
+          ..write('readAt: $readAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LibraryDatabase extends GeneratedDatabase {
   _$LibraryDatabase(QueryExecutor e) : super(e);
   $LibraryDatabaseManager get managers => $LibraryDatabaseManager(this);
   late final $LibraryFoldersTable libraryFolders = $LibraryFoldersTable(this);
   late final $TracksTable tracks = $TracksTable(this);
   late final $TrackMetadataTable trackMetadata = $TrackMetadataTable(this);
+  late final $TrackSourceMetadataTable trackSourceMetadata =
+      $TrackSourceMetadataTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1296,6 +1705,7 @@ abstract class _$LibraryDatabase extends GeneratedDatabase {
     libraryFolders,
     tracks,
     trackMetadata,
+    trackSourceMetadata,
   ];
 }
 
@@ -1975,6 +2385,237 @@ typedef $$TrackMetadataTableProcessedTableManager =
       TrackMetadataData,
       PrefetchHooks Function()
     >;
+typedef $$TrackSourceMetadataTableCreateCompanionBuilder =
+    TrackSourceMetadataCompanion Function({
+      Value<int> trackId,
+      Value<String?> title,
+      Value<String?> artist,
+      Value<String?> album,
+      Value<String?> releaseInfo,
+      required DateTime readAt,
+    });
+typedef $$TrackSourceMetadataTableUpdateCompanionBuilder =
+    TrackSourceMetadataCompanion Function({
+      Value<int> trackId,
+      Value<String?> title,
+      Value<String?> artist,
+      Value<String?> album,
+      Value<String?> releaseInfo,
+      Value<DateTime> readAt,
+    });
+
+class $$TrackSourceMetadataTableFilterComposer
+    extends Composer<_$LibraryDatabase, $TrackSourceMetadataTable> {
+  $$TrackSourceMetadataTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get artist => $composableBuilder(
+    column: $table.artist,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get album => $composableBuilder(
+    column: $table.album,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get releaseInfo => $composableBuilder(
+    column: $table.releaseInfo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get readAt => $composableBuilder(
+    column: $table.readAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TrackSourceMetadataTableOrderingComposer
+    extends Composer<_$LibraryDatabase, $TrackSourceMetadataTable> {
+  $$TrackSourceMetadataTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get artist => $composableBuilder(
+    column: $table.artist,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get album => $composableBuilder(
+    column: $table.album,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get releaseInfo => $composableBuilder(
+    column: $table.releaseInfo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get readAt => $composableBuilder(
+    column: $table.readAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TrackSourceMetadataTableAnnotationComposer
+    extends Composer<_$LibraryDatabase, $TrackSourceMetadataTable> {
+  $$TrackSourceMetadataTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get trackId =>
+      $composableBuilder(column: $table.trackId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get artist =>
+      $composableBuilder(column: $table.artist, builder: (column) => column);
+
+  GeneratedColumn<String> get album =>
+      $composableBuilder(column: $table.album, builder: (column) => column);
+
+  GeneratedColumn<String> get releaseInfo => $composableBuilder(
+    column: $table.releaseInfo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get readAt =>
+      $composableBuilder(column: $table.readAt, builder: (column) => column);
+}
+
+class $$TrackSourceMetadataTableTableManager
+    extends
+        RootTableManager<
+          _$LibraryDatabase,
+          $TrackSourceMetadataTable,
+          TrackSourceMetadataData,
+          $$TrackSourceMetadataTableFilterComposer,
+          $$TrackSourceMetadataTableOrderingComposer,
+          $$TrackSourceMetadataTableAnnotationComposer,
+          $$TrackSourceMetadataTableCreateCompanionBuilder,
+          $$TrackSourceMetadataTableUpdateCompanionBuilder,
+          (
+            TrackSourceMetadataData,
+            BaseReferences<
+              _$LibraryDatabase,
+              $TrackSourceMetadataTable,
+              TrackSourceMetadataData
+            >,
+          ),
+          TrackSourceMetadataData,
+          PrefetchHooks Function()
+        > {
+  $$TrackSourceMetadataTableTableManager(
+    _$LibraryDatabase db,
+    $TrackSourceMetadataTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TrackSourceMetadataTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TrackSourceMetadataTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$TrackSourceMetadataTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> trackId = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> artist = const Value.absent(),
+                Value<String?> album = const Value.absent(),
+                Value<String?> releaseInfo = const Value.absent(),
+                Value<DateTime> readAt = const Value.absent(),
+              }) => TrackSourceMetadataCompanion(
+                trackId: trackId,
+                title: title,
+                artist: artist,
+                album: album,
+                releaseInfo: releaseInfo,
+                readAt: readAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> trackId = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> artist = const Value.absent(),
+                Value<String?> album = const Value.absent(),
+                Value<String?> releaseInfo = const Value.absent(),
+                required DateTime readAt,
+              }) => TrackSourceMetadataCompanion.insert(
+                trackId: trackId,
+                title: title,
+                artist: artist,
+                album: album,
+                releaseInfo: releaseInfo,
+                readAt: readAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TrackSourceMetadataTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LibraryDatabase,
+      $TrackSourceMetadataTable,
+      TrackSourceMetadataData,
+      $$TrackSourceMetadataTableFilterComposer,
+      $$TrackSourceMetadataTableOrderingComposer,
+      $$TrackSourceMetadataTableAnnotationComposer,
+      $$TrackSourceMetadataTableCreateCompanionBuilder,
+      $$TrackSourceMetadataTableUpdateCompanionBuilder,
+      (
+        TrackSourceMetadataData,
+        BaseReferences<
+          _$LibraryDatabase,
+          $TrackSourceMetadataTable,
+          TrackSourceMetadataData
+        >,
+      ),
+      TrackSourceMetadataData,
+      PrefetchHooks Function()
+    >;
 
 class $LibraryDatabaseManager {
   final _$LibraryDatabase _db;
@@ -1985,4 +2626,6 @@ class $LibraryDatabaseManager {
       $$TracksTableTableManager(_db, _db.tracks);
   $$TrackMetadataTableTableManager get trackMetadata =>
       $$TrackMetadataTableTableManager(_db, _db.trackMetadata);
+  $$TrackSourceMetadataTableTableManager get trackSourceMetadata =>
+      $$TrackSourceMetadataTableTableManager(_db, _db.trackSourceMetadata);
 }

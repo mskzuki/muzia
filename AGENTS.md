@@ -48,6 +48,8 @@ docs/features/2607311830-folder-registration/
 
 プロダクト全体の要件は`docs/requirements.md`に記載し、機能固有の詳細は各機能の`spec.md`に記載する。
 
+Generator-Evaluator運用の評価基準は[`docs/harness/evaluator-rubric.md`](docs/harness/evaluator-rubric.md)、スプリント契約のテンプレートは[`docs/harness/sprint-contract-template.md`](docs/harness/sprint-contract-template.md)を参照する。`spec.md`は要件、`sprint-contract.md`は観測する振る舞い、`tasks.md`は実装・テスト作業を定義する。
+
 ## 対象プラットフォーム
 
 - macOS

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
@@ -216,6 +216,23 @@ void main() {
     expect(repository.registeredFolder, isNull);
   });
 
+  test('ブックマーク作成のネイティブエラーをユーザー向けエラーにする', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final viewModel = LibraryViewModel(
+      picker: _FakePicker(directory.path),
+      repository: InMemoryMusicRepository(),
+      bookmarkService: _PlatformExceptionBookmarkService(),
+    );
+
+    await viewModel.chooseAndScanFolder();
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, 'フォルダを登録できませんでした。');
+  });
+
   test('フォルダ選択に失敗してもエラー表示に留める', () async {
     final viewModel = LibraryViewModel(
       picker: _ThrowingPicker(),
@@ -273,6 +290,21 @@ class _ThrowingBookmarkService implements SecurityScopedBookmarkService {
   Future<RestoredSecurityScopedBookmark?> restoreBookmark(
     Uint8List bookmark,
   ) async => throw StateError('restoreBookmark failed');
+}
+
+class _PlatformExceptionBookmarkService
+    implements SecurityScopedBookmarkService {
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      throw PlatformException(
+        code: 'bookmark_creation_failed',
+        message: 'native failure',
+      );
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => null;
 }
 
 class _FailOnceMetadataRepository extends InMemoryMusicRepository {

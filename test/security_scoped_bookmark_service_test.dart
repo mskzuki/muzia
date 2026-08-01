@@ -16,17 +16,29 @@ void main() {
 
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-  test('ブックマーク作成のネイティブエラーをnullとして返す', () async {
+  test('ブックマーク作成のネイティブエラーを呼び出し元へ返す', () async {
     respondWithError('bookmark_creation_failed');
     final service = NativeSecurityScopedBookmarkService(channel: channel);
 
-    expect(await service.createBookmark('/tmp/music'), isNull);
+    expect(
+      service.createBookmark('/tmp/music'),
+      throwsA(
+        isA<PlatformException>().having(
+          (error) => error.code,
+          'code',
+          'bookmark_creation_failed',
+        ),
+      ),
+    );
   });
 
   test('ブックマーク復元のネイティブエラーをnullとして返す', () async {
     respondWithError('bookmark_access_denied');
     final service = NativeSecurityScopedBookmarkService(channel: channel);
 
-    expect(await service.restoreBookmark(Uint8List.fromList([1, 2, 3])), isNull);
+    expect(
+      await service.restoreBookmark(Uint8List.fromList([1, 2, 3])),
+      isNull,
+    );
   });
 }

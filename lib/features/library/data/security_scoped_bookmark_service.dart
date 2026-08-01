@@ -10,6 +10,8 @@ class RestoredSecurityScopedBookmark {
   final Uint8List bookmark;
 }
 
+/// 失敗は例外ではなく `null` で表す。呼び出し側は、ブックマークを扱えない環境と
+/// アクセス権を復元できなかった場合を、同じ「ブックマーク無し」として扱う。
 abstract interface class SecurityScopedBookmarkService {
   Future<Uint8List?> createBookmark(String path);
 
@@ -46,6 +48,9 @@ class NativeSecurityScopedBookmarkService
     } on MissingPluginException {
       // macOS以外や、テスト環境ではネイティブ実装が存在しない。
       return null;
+    } on PlatformException {
+      // ネイティブ側の `FlutterError`（bookmark_creation_failed など）。
+      return null;
     } on StateError {
       // Flutter bindingがない単体テストではMethodChannelを利用できない。
       return null;
@@ -70,6 +75,10 @@ class NativeSecurityScopedBookmarkService
         bookmark: restoredBookmark,
       );
     } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      // ネイティブ側の `FlutterError`（bookmark_access_denied など）。
+      // フォルダを移動・削除された場合もここへ来る。
       return null;
     } on StateError {
       return null;

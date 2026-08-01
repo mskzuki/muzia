@@ -35,6 +35,73 @@ void main() {
     expect(folder.securityScopedBookmark, [1, 2, 3]);
   });
 
+  test('ブックマークを復元できなくても保存済みの楽曲を読み込む', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
+    await PersistentMusicRepository(
+      database,
+      bookmarkService: _FakeBookmarkService(),
+    ).registerFolder(
+      '/tmp/music',
+      const [track],
+      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
+    );
+
+    final restored = PersistentMusicRepository(
+      database,
+      bookmarkService: const _UnavailableBookmarkService(),
+    );
+    await restored.load();
+
+    expect(restored.registeredFolder, '/tmp/music');
+    expect(restored.tracks, [track]);
+    expect(restored.folderAccessLost, isTrue);
+  });
+
+  test('ブックマーク復元が例外を投げても保存済みの楽曲を読み込む', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
+    await PersistentMusicRepository(
+      database,
+      bookmarkService: _FakeBookmarkService(),
+    ).registerFolder(
+      '/tmp/music',
+      const [track],
+      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
+    );
+
+    final restored = PersistentMusicRepository(
+      database,
+      bookmarkService: const _ThrowingBookmarkService(),
+    );
+    await restored.load();
+
+    expect(restored.tracks, [track]);
+    expect(restored.folderAccessLost, isTrue);
+  });
+
+  test('ブックマークを復元できた場合はアクセス権喪失として扱わない', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final bookmarkService = _FakeBookmarkService();
+    final repository = PersistentMusicRepository(
+      database,
+      bookmarkService: bookmarkService,
+    );
+    const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
+
+    await repository.registerFolder(
+      '/tmp/music',
+      const [track],
+      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
+    );
+    await repository.load();
+
+    expect(repository.folderAccessLost, isFalse);
+  });
+
   test('登録フォルダと楽曲メタデータを保存して復元する', () async {
     final database = LibraryDatabase(NativeDatabase.memory());
     addTearDown(database.close);
@@ -203,6 +270,33 @@ void main() {
     expect(saved.album, isNull);
     expect(saved.releaseInfo, isNull);
   });
+}
+
+/// ネイティブ実装がフォルダのアクセス権を復元できなかった場合。
+class _UnavailableBookmarkService implements SecurityScopedBookmarkService {
+  const _UnavailableBookmarkService();
+
+  @override
+  Future<Uint8List?> createBookmark(String path) async => null;
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => null;
+}
+
+/// 契約に反して例外を投げる実装でも、ライブラリ読み込みを止めないことの確認用。
+class _ThrowingBookmarkService implements SecurityScopedBookmarkService {
+  const _ThrowingBookmarkService();
+
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      throw StateError('createBookmark failed');
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => throw StateError('restoreBookmark failed');
 }
 
 class _FakeBookmarkService implements SecurityScopedBookmarkService {

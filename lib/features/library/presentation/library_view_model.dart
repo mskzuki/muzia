@@ -48,6 +48,7 @@ class LibraryViewModel extends ChangeNotifier {
   LibraryStatus _status = LibraryStatus.empty;
   List<Track> _tracks = const [];
   String? _errorMessage;
+  String? _warningTitle;
   String? _warningMessage;
   bool _initialized = false;
 
@@ -55,18 +56,31 @@ class LibraryViewModel extends ChangeNotifier {
   List<Track> get tracks => List.unmodifiable(_tracks);
   String? get registeredFolder => _repository.registeredFolder;
   String? get errorMessage => _errorMessage;
+  String? get warningTitle => _warningTitle;
   String? get warningMessage => _warningMessage;
 
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
     _status = LibraryStatus.loading;
-    _warningMessage = null;
+    _clearWarning();
     notifyListeners();
     try {
       await _repository.load();
       _tracks = _repository.tracks;
-      _status = _tracks.isEmpty ? LibraryStatus.empty : LibraryStatus.ready;
+      if (_tracks.isEmpty) {
+        _status = LibraryStatus.empty;
+      } else if (_repository.folderAccessLost) {
+        // 楽曲、メタデータ、削除状態はDBに残っている。フォルダのアクセス権だけを
+        // 失った状態なので、一覧は表示したうえで再登録を促す。
+        _status = LibraryStatus.readyWithWarnings;
+        _setWarning(
+          title: 'フォルダにアクセスできません',
+          message: 'フォルダの場所が変わった可能性があります。フォルダを登録し直してください。',
+        );
+      } else {
+        _status = LibraryStatus.ready;
+      }
       notifyListeners();
     } on Object {
       _setError('ライブラリの読み込みに失敗しました。');
@@ -74,9 +88,16 @@ class LibraryViewModel extends ChangeNotifier {
   }
 
   Future<void> chooseAndScanFolder() async {
-    final selectedPath = await _picker.pickDirectory();
-    if (selectedPath == null) return;
-    final bookmark = await _bookmarkService.createBookmark(selectedPath);
+    final String? selectedPath;
+    final Uint8List? bookmark;
+    try {
+      selectedPath = await _picker.pickDirectory();
+      if (selectedPath == null) return;
+      bookmark = await _bookmarkService.createBookmark(selectedPath);
+    } on Object {
+      _setError('フォルダを登録できませんでした。');
+      return;
+    }
     await registerAndScan(selectedPath, securityScopedBookmark: bookmark);
   }
 
@@ -96,7 +117,7 @@ class LibraryViewModel extends ChangeNotifier {
 
     _status = LibraryStatus.loading;
     _errorMessage = null;
-    _warningMessage = null;
+    _clearWarning();
     notifyListeners();
     try {
       final tracks = <Track>[];
@@ -121,7 +142,10 @@ class LibraryViewModel extends ChangeNotifier {
         return;
       } else if (metadataIssueCount > 0) {
         _status = LibraryStatus.readyWithWarnings;
-        _warningMessage = '$metadataIssueCount件の音楽ファイルを解析できませんでした。';
+        _setWarning(
+          title: '一部のファイルを読み込めませんでした',
+          message: '$metadataIssueCount件の音楽ファイルを解析できませんでした。',
+        );
       } else {
         _status = LibraryStatus.ready;
       }
@@ -150,7 +174,7 @@ class LibraryViewModel extends ChangeNotifier {
           ? LibraryStatus.empty
           : LibraryStatus.ready;
       _errorMessage = null;
-      _warningMessage = null;
+      _clearWarning();
       notifyListeners();
       return true;
     } on Object {
@@ -199,5 +223,15 @@ class LibraryViewModel extends ChangeNotifier {
     _status = LibraryStatus.error;
     _errorMessage = message;
     notifyListeners();
+  }
+
+  void _setWarning({required String title, required String message}) {
+    _warningTitle = title;
+    _warningMessage = message;
+  }
+
+  void _clearWarning() {
+    _warningTitle = null;
+    _warningMessage = null;
   }
 }

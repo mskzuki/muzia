@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:muzia/app/providers.dart';
@@ -123,7 +125,9 @@ class _Sidebar extends StatelessWidget {
     required this.onSectionChanged,
   });
 
-  final VoidCallback onPickFolder;
+  /// `VoidCallback` として受け取るとFutureが破棄され、失敗が握りつぶされる。
+  /// 非同期であることを型で表し、[LibraryViewModel] 側のエラー状態へ委ねる。
+  final Future<void> Function() onPickFolder;
   final _LibrarySection section;
   final ValueChanged<_LibrarySection> onSectionChanged;
 
@@ -156,7 +160,7 @@ class _Sidebar extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: onPickFolder,
+                onPressed: () => unawaited(onPickFolder()),
                 icon: const Icon(Icons.folder_open),
                 label: const Text('フォルダを登録'),
               ),
@@ -225,6 +229,7 @@ class _MainContent extends StatelessWidget {
               ),
             LibraryStatus.ready => _TrackList(
               tracks: visibleTracks,
+              warningTitle: null,
               warningMessage: null,
               onRemove: libraryViewModel.removeTracks,
               onEdit: (track, values) =>
@@ -234,6 +239,7 @@ class _MainContent extends StatelessWidget {
             ),
             LibraryStatus.readyWithWarnings => _TrackList(
               tracks: visibleTracks,
+              warningTitle: libraryViewModel.warningTitle,
               warningMessage: libraryViewModel.warningMessage,
               onRemove: libraryViewModel.removeTracks,
               onEdit: (track, values) =>
@@ -293,6 +299,7 @@ class _EmptyLibrary extends _StatusMessage {
 class _TrackList extends StatefulWidget {
   const _TrackList({
     required this.tracks,
+    required this.warningTitle,
     required this.warningMessage,
     required this.onRemove,
     required this.onEdit,
@@ -301,6 +308,7 @@ class _TrackList extends StatefulWidget {
   });
 
   final List<Track> tracks;
+  final String? warningTitle;
   final String? warningMessage;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
@@ -394,7 +402,7 @@ class _TrackListState extends State<_TrackList> {
         if (hasWarning && index == 0) {
           return ListTile(
             leading: const Icon(Icons.warning_amber_outlined),
-            title: const Text('一部のファイルを読み込めませんでした'),
+            title: Text(widget.warningTitle ?? '警告'),
             subtitle: Text(widget.warningMessage!),
           );
         }

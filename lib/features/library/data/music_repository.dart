@@ -13,6 +13,10 @@ abstract interface class MusicRepository {
   Future<void> load();
   String? get registeredFolder;
   List<Track> get tracks;
+
+  /// 直近の [load] で、保存済みフォルダへのアクセス権を復元できなかったかどうか。
+  /// 楽曲一覧の読み込み自体は成功しているため、エラーではなく警告として扱う。
+  bool get folderAccessLost;
   Future<void> registerFolder(
     String path,
     List<Track> tracks, {
@@ -42,6 +46,9 @@ class InMemoryMusicRepository implements MusicRepository {
 
   @override
   List<Track> get tracks => List.unmodifiable(_tracks);
+
+  @override
+  bool get folderAccessLost => false;
 
   @override
   Future<void> registerFolder(
@@ -101,6 +108,7 @@ class PersistentMusicRepository implements MusicRepository {
   final SecurityScopedBookmarkService _bookmarkService;
   String? _registeredFolder;
   List<Track> _tracks = const [];
+  bool _folderAccessLost = false;
 
   static Future<PersistentMusicRepository> open({
     SecurityScopedBookmarkService? bookmarkService,
@@ -124,7 +132,11 @@ class PersistentMusicRepository implements MusicRepository {
   List<Track> get tracks => List.unmodifiable(_tracks);
 
   @override
+  bool get folderAccessLost => _folderAccessLost;
+
+  @override
   Future<void> load() async {
+    _folderAccessLost = false;
     final folder = await (_database.select(
       _database.libraryFolders,
     )..where((table) => table.isActive.equals(true))).getSingleOrNull();
@@ -154,20 +166,22 @@ class PersistentMusicRepository implements MusicRepository {
       );
     }
     var folderPath = folder.path;
-    var bookmark = folder.securityScopedBookmark;
-    if (bookmark != null) {
-      final restored = await _bookmarkService.restoreBookmark(bookmark);
-      if (restored != null) {
+    if (folder.securityScopedBookmark != null) {
+      // フォルダのアクセス権を復元できなくても、保存済みの楽曲一覧は表示できる。
+      // 失敗は警告として呼び出し元へ伝え、読み込み自体は続行する。
+      final restored = await _restoreBookmark(folder.securityScopedBookmark!);
+      if (restored == null) {
+        _folderAccessLost = true;
+      } else {
         folderPath = restored.path;
-        bookmark = restored.bookmark;
         if (folderPath != folder.path ||
-            bookmark != folder.securityScopedBookmark) {
+            restored.bookmark != folder.securityScopedBookmark) {
           await (_database.update(
             _database.libraryFolders,
           )..where((table) => table.id.equals(folder.id))).write(
             LibraryFoldersCompanion(
               path: Value(folderPath),
-              securityScopedBookmark: Value(bookmark),
+              securityScopedBookmark: Value(restored.bookmark),
               updatedAt: Value(DateTime.now().toUtc()),
             ),
           );
@@ -176,6 +190,18 @@ class PersistentMusicRepository implements MusicRepository {
     }
     _registeredFolder = folderPath;
     _tracks = List.unmodifiable(loaded);
+  }
+
+  /// [SecurityScopedBookmarkService] は失敗を `null` で返す契約だが、
+  /// 差し替え可能な依存であるため、契約に反する例外でも読み込みを止めない。
+  Future<RestoredSecurityScopedBookmark?> _restoreBookmark(
+    Uint8List bookmark,
+  ) async {
+    try {
+      return await _bookmarkService.restoreBookmark(bookmark);
+    } on Object {
+      return null;
+    }
   }
 
   @override
@@ -329,6 +355,9 @@ class LazyPersistentMusicRepository implements MusicRepository {
 
   @override
   List<Track> get tracks => _delegate?.tracks ?? const [];
+
+  @override
+  bool get folderAccessLost => _delegate?.folderAccessLost ?? false;
 
   @override
   Future<void> registerFolder(

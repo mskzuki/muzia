@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
+import 'package:muzia/features/library/data/security_scoped_bookmark_service.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
@@ -138,6 +140,52 @@ void main() {
     expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
   });
 
+  test('フォルダのアクセス権を復元できない場合も楽曲一覧を表示する', () async {
+    const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
+    final repository = _AccessLostRepository();
+    await repository.registerFolder('/tmp/music', const [track]);
+    final viewModel = LibraryViewModel(repository: repository);
+
+    await viewModel.initialize();
+
+    expect(viewModel.status, LibraryStatus.readyWithWarnings);
+    expect(viewModel.tracks, [track]);
+    expect(viewModel.warningTitle, 'フォルダにアクセスできません');
+    expect(viewModel.warningMessage, 'フォルダの場所が変わった可能性があります。フォルダを登録し直してください。');
+  });
+
+  test('ブックマーク作成に失敗してもエラー表示に留める', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = InMemoryMusicRepository();
+    final viewModel = LibraryViewModel(
+      picker: _FakePicker(directory.path),
+      scanner: _FakeScanner(const []),
+      repository: repository,
+      bookmarkService: _ThrowingBookmarkService(),
+    );
+
+    await viewModel.chooseAndScanFolder();
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, 'フォルダを登録できませんでした。');
+    expect(repository.registeredFolder, isNull);
+  });
+
+  test('フォルダ選択に失敗してもエラー表示に留める', () async {
+    final viewModel = LibraryViewModel(
+      picker: _ThrowingPicker(),
+      repository: InMemoryMusicRepository(),
+    );
+
+    await viewModel.chooseAndScanFolder();
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, 'フォルダを登録できませんでした。');
+  });
+
   test('保存失敗後の再保存成功で一覧表示可能な状態へ戻る', () async {
     final directory = await Directory.systemTemp.createTemp(
       'muzia-library-test-',
@@ -161,6 +209,28 @@ void main() {
     expect(viewModel.errorMessage, isNull);
     expect(viewModel.tracks.single.title, '更新後の曲名');
   });
+}
+
+/// 楽曲は読み込めるが、フォルダのアクセス権を復元できなかったリポジトリ。
+class _AccessLostRepository extends InMemoryMusicRepository {
+  @override
+  bool get folderAccessLost => true;
+}
+
+class _ThrowingPicker implements FilePickerService {
+  @override
+  Future<String?> pickDirectory() async => throw StateError('picker failed');
+}
+
+class _ThrowingBookmarkService implements SecurityScopedBookmarkService {
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      throw StateError('createBookmark failed');
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => throw StateError('restoreBookmark failed');
 }
 
 class _FailOnceMetadataRepository extends InMemoryMusicRepository {

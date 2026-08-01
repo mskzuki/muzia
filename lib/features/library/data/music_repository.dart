@@ -215,6 +215,9 @@ class PersistentMusicRepository implements MusicRepository {
   }) async {
     final now = DateTime.now().toUtc();
     await _database.transaction(() async {
+      // docs/database.md の FOREIGN KEY が未実装でカスケード削除が働かないため、
+      // 参照先を失う行を明示的に削除する。残すと孤児行が蓄積する。
+      await _database.delete(_database.trackMetadata).go();
       await _database.delete(_database.trackSourceMetadata).go();
       await _database.delete(_database.tracks).go();
       await (_database.update(

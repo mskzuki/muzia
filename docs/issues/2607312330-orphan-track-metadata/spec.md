@@ -5,7 +5,7 @@
 - 課題ID: 2607312330
 - 種別: 不具合（データ整合性）
 - 対応する全体要件: FR-010
-- ステータス: Draft
+- ステータス: Completed
 - 作成日: 2026-07-31
 
 ## 1. 事象
@@ -45,15 +45,15 @@ await _database.delete(_database.tracks).go();
 
 ## 4. 要件
 
-- [ ] REQ-001: フォルダ登録時に、参照先を失う `track_metadata` を削除する。
-- [ ] REQ-002: `track_metadata` と `track_source_metadata` の行数が常に一致する。
-- [ ] REQ-003: ユーザーの音楽ファイルには影響しない。
+- [x] REQ-001: フォルダ登録時に、参照先を失う `track_metadata` を削除する。
+- [x] REQ-002: `track_metadata` と `track_source_metadata` の行数が常に一致する。
+- [x] REQ-003: ユーザーの音楽ファイルには影響しない。
 
 ## 5. 完了条件
 
-- [ ] フォルダ再登録後に孤児行が残らない。
-- [ ] 行数の一致を検証するテストが追加され、成功する。
-- [ ] `flutter analyze` と `flutter test` が成功する。
+- [x] フォルダ再登録後に孤児行が残らない。
+- [x] 行数の一致を検証するテストが追加され、成功する。
+- [x] `flutter analyze` と `flutter test` が成功する。
 
 ## 6. 実装メモ
 
@@ -62,7 +62,17 @@ await _database.delete(_database.tracks).go();
 `PRAGMA foreign_keys = ON` とカスケード削除で担保する。
 外部キーの導入は既存DBのマイグレーションを伴うため、本課題では削除の追加までを対象とする。
 
-## 7. 関連文書
+## 7. 残課題
+
+`registerFolder` での明示的な削除は、参照整合性をアプリケーション側で担保している。
+恒久対応として、`docs/database.md` の定義どおりに FOREIGN KEY を導入し、
+`PRAGMA foreign_keys = ON` とカスケード削除で担保する必要がある。
+
+- 対象: `tracks.library_folder_id`、`track_metadata.track_id`、`track_source_metadata.track_id`
+- 影響: 既存DBのマイグレーション（Driftのスキーマバージョン更新）を伴う
+- 本課題の対象外とし、別課題として対応する
+
+## 8. 関連文書
 
 - [データベース仕様](../../database.md)
 - [ライブラリ永続化](../../features/2607312001-library-persistence/spec.md)

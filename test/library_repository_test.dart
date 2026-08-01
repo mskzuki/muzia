@@ -206,6 +206,29 @@ void main() {
     expect(restored.tracks, [second]);
   });
 
+  test('フォルダ再登録で track_metadata の孤児行を残さない', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    const first = Track(filePath: '/tmp/first.mp3', fileExtension: '.mp3');
+    const second = Track(filePath: '/tmp/second.mp3', fileExtension: '.mp3');
+    const third = Track(filePath: '/tmp/third.mp3', fileExtension: '.mp3');
+
+    await repository.registerFolder('/tmp/first', const [first]);
+    await repository.registerFolder('/tmp/second', const [second, third]);
+
+    final metadata = await database.select(database.trackMetadata).get();
+    final sourceMetadata = await database
+        .select(database.trackSourceMetadata)
+        .get();
+    final trackIds = (await database.select(database.tracks).get())
+        .map((row) => row.id)
+        .toSet();
+    expect(metadata, hasLength(2));
+    expect(metadata, hasLength(sourceMetadata.length));
+    expect(metadata.map((row) => row.trackId).toSet(), trackIds);
+  });
+
   test('複数楽曲を論理削除して元データを保持する', () async {
     final database = LibraryDatabase(NativeDatabase.memory());
     addTearDown(database.close);

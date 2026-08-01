@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:muzia/features/library/data/library_database.dart' hide Track;
@@ -174,8 +175,10 @@ class PersistentMusicRepository implements MusicRepository {
         _folderAccessLost = true;
       } else {
         folderPath = restored.path;
+        // MethodChannelは毎回新しい `Uint8List` を返すため、`!=` では常に
+        // 差分ありと判定され、読み込みのたびに不要なUPDATEが走る。
         if (folderPath != folder.path ||
-            restored.bookmark != folder.securityScopedBookmark) {
+            !listEquals(restored.bookmark, folder.securityScopedBookmark)) {
           await (_database.update(
             _database.libraryFolders,
           )..where((table) => table.id.equals(folder.id))).write(

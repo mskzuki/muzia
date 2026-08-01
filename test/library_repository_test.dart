@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/features/library/data/library_database.dart' hide Track;
@@ -33,6 +34,55 @@ void main() {
     expect(restored.registeredFolder, '/tmp/music');
     final folder = await database.select(database.libraryFolders).getSingle();
     expect(folder.securityScopedBookmark, [1, 2, 3]);
+  });
+
+  test('ブックマークの内容が変わらなければ書き戻さない', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(
+      database,
+      bookmarkService: const _CopyingBookmarkService(),
+    );
+    await repository.registerFolder(
+      '/tmp/music',
+      const [Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3')],
+      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
+    );
+    // 書き戻しが起きたかどうかを updated_at の変化で判定する。
+    final markedAt = DateTime.utc(2020);
+    await database
+        .update(database.libraryFolders)
+        .write(LibraryFoldersCompanion(updatedAt: Value(markedAt)));
+
+    await repository.load();
+
+    final folder = await database.select(database.libraryFolders).getSingle();
+    expect(folder.updatedAt.isAtSameMomentAs(markedAt), isTrue);
+    expect(folder.securityScopedBookmark, [1, 2, 3]);
+  });
+
+  test('ブックマークの内容が変わったら書き戻す', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(
+      database,
+      bookmarkService: const _RefreshingBookmarkService(),
+    );
+    await repository.registerFolder(
+      '/tmp/music',
+      const [Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3')],
+      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
+    );
+    final markedAt = DateTime.utc(2020);
+    await database
+        .update(database.libraryFolders)
+        .write(LibraryFoldersCompanion(updatedAt: Value(markedAt)));
+
+    await repository.load();
+
+    final folder = await database.select(database.libraryFolders).getSingle();
+    expect(folder.securityScopedBookmark, [9, 9, 9]);
+    expect(folder.updatedAt.isAtSameMomentAs(markedAt), isFalse);
   });
 
   test('ブックマークを復元できなくても保存済みの楽曲を読み込む', () async {
@@ -270,6 +320,40 @@ void main() {
     expect(saved.album, isNull);
     expect(saved.releaseInfo, isNull);
   });
+}
+
+/// MethodChannelは毎回新しい `Uint8List` を返す。内容が同じでもインスタンスは異なる。
+class _CopyingBookmarkService implements SecurityScopedBookmarkService {
+  const _CopyingBookmarkService();
+
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => RestoredSecurityScopedBookmark(
+    path: '/tmp/music',
+    bookmark: Uint8List.fromList(bookmark),
+  );
+}
+
+/// bookmarkがstaleになり、ネイティブ側が新しい内容を返した場合。
+class _RefreshingBookmarkService implements SecurityScopedBookmarkService {
+  const _RefreshingBookmarkService();
+
+  @override
+  Future<Uint8List?> createBookmark(String path) async =>
+      Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<RestoredSecurityScopedBookmark?> restoreBookmark(
+    Uint8List bookmark,
+  ) async => RestoredSecurityScopedBookmark(
+    path: '/tmp/music',
+    bookmark: Uint8List.fromList([9, 9, 9]),
+  );
 }
 
 /// ネイティブ実装がフォルダのアクセス権を復元できなかった場合。

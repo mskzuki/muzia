@@ -18,8 +18,6 @@
 
 - `flutter analyze`: 警告なし
 - `flutter test`: 全件成功
-
-### 未実行の確認
-
-- macOS Integration Test（`flutter test integration_test -d macos`）: 未実行。
-  対象の分岐はWidgetテストで検証済み。
+- macOS Integration Test: 既存7ファイルを個別に実行し全件成功。
+  警告を `_TrackList` の外へ移したため、`search_test.dart` を含む一覧表示の
+  Integration Testに退行がないことを確認した。

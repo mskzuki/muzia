@@ -18,6 +18,7 @@
 
 - `flutter analyze`: 警告なし
 - `flutter test`: 全件成功
+- macOS Integration Test: 既存7ファイルを個別に実行し全件成功。
 
 ### 補足
 

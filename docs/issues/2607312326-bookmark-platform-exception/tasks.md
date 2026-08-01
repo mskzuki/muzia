@@ -26,8 +26,13 @@
 
 - `flutter analyze`: 警告なし
 - `flutter test`: 全件成功
+- macOS Integration Test: 既存7ファイルを個別に実行し全件成功。
+  ディレクトリ一括実行（`flutter test integration_test -d macos`）はアプリの連続起動に
+  失敗するため、ファイル単位で実行した。この起動失敗は変更前の `main` でも発生する。
 
 ### 未実行の確認
 
-- macOS Integration Test（`flutter test integration_test -d macos`）: 実フォルダの移動・削除を伴う
-  ネイティブブックマークの失敗は本環境で再現できないため未実行。
+- ネイティブブックマークの失敗経路そのもののIntegration Test: 実フォルダの移動・削除と
+  App Sandbox下でのアクセス権喪失が必要で、本環境では再現できないため未実行。
+  該当経路は単体テスト（`test/security_scoped_bookmark_service_test.dart`、
+  `test/library_repository_test.dart`）で検証している。

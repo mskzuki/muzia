@@ -190,8 +190,7 @@ class _MainContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (section == _LibrarySection.artistAlbum &&
-        (libraryViewModel.status == LibraryStatus.ready ||
-            libraryViewModel.status == LibraryStatus.readyWithWarnings)) {
+        libraryViewModel.canShowTracks) {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),
@@ -201,6 +200,9 @@ class _MainContent extends StatelessWidget {
       libraryViewModel.tracks,
       searchQuery,
     );
+    final showsLibrary =
+        viewModel.status != AppShellStatus.loading &&
+        viewModel.status != AppShellStatus.error;
     final content = viewModel.status == AppShellStatus.loading
         ? const _StatusMessage(
             icon: Icons.hourglass_top,
@@ -220,43 +222,62 @@ class _MainContent extends StatelessWidget {
               message: '準備が完了するまでお待ちください。',
             ),
             LibraryStatus.empty => const _EmptyLibrary(),
-            LibraryStatus.ready
-                when searchQuery.trim().isNotEmpty && visibleTracks.isEmpty =>
-              const _StatusMessage(
-                icon: Icons.search_off,
-                title: '該当する楽曲がありません',
-                message: 'タイトル、アーティスト、アルバムを確認してください。',
-              ),
-            LibraryStatus.ready => _TrackList(
-              tracks: visibleTracks,
-              warningTitle: null,
-              warningMessage: null,
-              onRemove: libraryViewModel.removeTracks,
-              onEdit: (track, values) =>
-                  libraryViewModel.updateTrackMetadata(track, values),
-              onBulkEdit: libraryViewModel.updateTracksMetadata,
-              onPlay: onPlay,
-            ),
-            LibraryStatus.readyWithWarnings => _TrackList(
-              tracks: visibleTracks,
-              warningTitle: libraryViewModel.warningTitle,
-              warningMessage: libraryViewModel.warningMessage,
-              onRemove: libraryViewModel.removeTracks,
-              onEdit: (track, values) =>
-                  libraryViewModel.updateTrackMetadata(track, values),
-              onBulkEdit: libraryViewModel.updateTracksMetadata,
-              onPlay: onPlay,
-            ),
             LibraryStatus.error => _StatusMessage(
               icon: Icons.error_outline,
               title: '読み込みエラー',
               message: libraryViewModel.errorMessage ?? 'ライブラリを読み込めませんでした。',
             ),
+            // 一覧を表示できる2つの状態は、検索0件の扱いも同じ。
+            LibraryStatus.ready ||
+            LibraryStatus.readyWithWarnings =>
+              searchQuery.trim().isNotEmpty && visibleTracks.isEmpty
+                  ? const _StatusMessage(
+                      icon: Icons.search_off,
+                      title: '該当する楽曲がありません',
+                      message: 'タイトル、アーティスト、アルバムを確認してください。',
+                    )
+                  : _TrackList(
+                      tracks: visibleTracks,
+                      onRemove: libraryViewModel.removeTracks,
+                      onEdit: (track, values) =>
+                          libraryViewModel.updateTrackMetadata(track, values),
+                      onBulkEdit: libraryViewModel.updateTracksMetadata,
+                      onPlay: onPlay,
+                    ),
           };
 
+    // 警告は一覧の外に出す。検索0件の空状態でも通知が消えないようにする。
+    final warningMessage = libraryViewModel.warningMessage;
+    final showsWarning =
+        showsLibrary && libraryViewModel.canShowTracks && warningMessage != null;
     return Padding(
       padding: const EdgeInsets.all(32),
-      child: Center(child: content),
+      child: Column(
+        children: [
+          if (showsWarning)
+            _WarningNotice(
+              title: libraryViewModel.warningTitle ?? '警告',
+              message: warningMessage,
+            ),
+          Expanded(child: Center(child: content)),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarningNotice extends StatelessWidget {
+  const _WarningNotice({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.warning_amber_outlined),
+      title: Text(title),
+      subtitle: Text(message),
     );
   }
 }
@@ -299,8 +320,6 @@ class _EmptyLibrary extends _StatusMessage {
 class _TrackList extends StatefulWidget {
   const _TrackList({
     required this.tracks,
-    required this.warningTitle,
-    required this.warningMessage,
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
@@ -308,8 +327,6 @@ class _TrackList extends StatefulWidget {
   });
 
   final List<Track> tracks;
-  final String? warningTitle;
-  final String? warningMessage;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
@@ -393,21 +410,11 @@ class _TrackListState extends State<_TrackList> {
   @override
   Widget build(BuildContext context) {
     final hasSelection = _selectedPaths.isNotEmpty;
-    final hasWarning = widget.warningMessage != null;
-    final noticeOffset = hasWarning ? 1 : 0;
     return ListView.separated(
-      itemCount: widget.tracks.length + noticeOffset + (hasSelection ? 1 : 0),
+      itemCount: widget.tracks.length + (hasSelection ? 1 : 0),
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        if (hasWarning && index == 0) {
-          return ListTile(
-            leading: const Icon(Icons.warning_amber_outlined),
-            title: Text(widget.warningTitle ?? '警告'),
-            subtitle: Text(widget.warningMessage!),
-          );
-        }
-        final adjustedIndex = index - noticeOffset;
-        if (hasSelection && adjustedIndex == 0) {
+        if (hasSelection && index == 0) {
           return Material(
             color: const Color(0x1FEDF2FE),
             child: ListTile(
@@ -432,8 +439,7 @@ class _TrackListState extends State<_TrackList> {
             ),
           );
         }
-        final track =
-            widget.tracks[hasSelection ? adjustedIndex - 1 : adjustedIndex];
+        final track = widget.tracks[hasSelection ? index - 1 : index];
         return ListTile(
           leading: Checkbox(
             value: _selectedPaths.contains(track.filePath),

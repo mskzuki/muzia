@@ -5,7 +5,7 @@
 - 課題ID: 2607312327
 - 種別: 不具合（退行）
 - 対応する全体要件: FR-008
-- ステータス: Draft
+- ステータス: Completed
 - 作成日: 2026-07-31
 
 ## 1. 事象
@@ -39,19 +39,26 @@ LibraryStatus.ready
 
 ## 4. 要件
 
-- [ ] REQ-001: `ready` と `readyWithWarnings` のどちらでも、検索0件の空状態を表示する。
-- [ ] REQ-002: 警告そのものは引き続き通知する。
+- [x] REQ-001: `ready` と `readyWithWarnings` のどちらでも、検索0件の空状態を表示する。
+- [x] REQ-002: 警告そのものは引き続き通知する。
 
 ## 5. 完了条件
 
-- [ ] 両ステータスで検索0件の空状態を表示する。
-- [ ] Widgetテストで検証する。
-- [ ] `flutter analyze` と `flutter test` が成功する。
+- [x] 両ステータスで検索0件の空状態を表示する。
+- [x] Widgetテストで検証する。
+- [x] `flutter analyze` と `flutter test` が成功する。
 
 ## 6. 実装メモ
 
 `ready` と `readyWithWarnings` は「楽曲一覧を表示できる状態」として同じ扱いになる箇所が
 複数あるため、判定を1か所に集約する。
+
+判定は `LibraryViewModel.canShowTracks` に集約し、`_MainContent` の分岐と
+アーティスト / アルバム表示の条件で共有する。
+
+警告行は `_TrackList` の先頭要素だったため、検索0件で一覧を描画しないと警告も消えていた。
+REQ-002を満たすため、警告を一覧の外（`_WarningNotice`）へ出し、一覧と空状態の
+どちらでも表示されるようにする。
 
 ## 7. 関連文書
 

@@ -59,6 +59,12 @@ class LibraryViewModel extends ChangeNotifier {
   String? get warningTitle => _warningTitle;
   String? get warningMessage => _warningMessage;
 
+  /// 楽曲一覧を表示できる状態かどうか。`ready` と `readyWithWarnings` は
+  /// 警告の有無が違うだけで、一覧の表示可否としては同じ扱いになる。
+  bool get canShowTracks =>
+      _status == LibraryStatus.ready ||
+      _status == LibraryStatus.readyWithWarnings;
+
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;

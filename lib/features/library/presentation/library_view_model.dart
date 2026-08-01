@@ -144,6 +144,7 @@ class LibraryViewModel extends ChangeNotifier {
       if (candidateCount == 0) {
         _status = LibraryStatus.empty;
       } else if (tracks.isEmpty && metadataIssueCount > 0) {
+        _restoreTracksFromRepository();
         _setError('音楽ファイルのメタデータを解析できませんでした。');
         return;
       } else if (metadataIssueCount > 0) {
@@ -162,10 +163,18 @@ class LibraryViewModel extends ChangeNotifier {
       );
       notifyListeners();
     } on FolderAccessException {
+      _restoreTracksFromRepository();
       _setError('フォルダにアクセスできません。権限を確認してください。');
     } on Object {
+      _restoreTracksFromRepository();
       _setError('フォルダのスキャンに失敗しました。');
     }
+  }
+
+  /// スキャン中は受信した楽曲で `_tracks` を逐次差し替えるため、失敗すると
+  /// 中途半端な結果が残る。永続層は登録前の内容のままなので、そちらへ戻す。
+  void _restoreTracksFromRepository() {
+    _tracks = _repository.tracks;
   }
 
   Future<bool> removeTracks(List<Track> tracks) async {

@@ -140,6 +140,48 @@ void main() {
     expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
   });
 
+  test('スキャン失敗後は楽曲一覧を永続層の内容へ戻す', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    const savedTrack = Track(filePath: '/tmp/saved.mp3', fileExtension: '.mp3');
+    final repository = InMemoryMusicRepository();
+    await repository.registerFolder('/tmp/saved', const [savedTrack]);
+    final viewModel = LibraryViewModel(
+      scanner: _PartialThenFailScanner(),
+      repository: repository,
+    );
+    await viewModel.initialize();
+
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
+    expect(viewModel.tracks, [savedTrack]);
+    expect(repository.registeredFolder, '/tmp/saved');
+  });
+
+  test('解析全件失敗でも楽曲一覧を永続層の内容へ戻す', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    const savedTrack = Track(filePath: '/tmp/saved.mp3', fileExtension: '.mp3');
+    final repository = InMemoryMusicRepository();
+    await repository.registerFolder('/tmp/saved', const [savedTrack]);
+    final viewModel = LibraryViewModel(
+      scanner: _IssueScanner(),
+      repository: repository,
+    );
+    await viewModel.initialize();
+
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.tracks, [savedTrack]);
+  });
+
   test('フォルダのアクセス権を復元できない場合も楽曲一覧を表示する', () async {
     const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
     final repository = _AccessLostRepository();
@@ -263,6 +305,20 @@ class _PartialIssueScanner implements FileScannerService {
     yield const TrackFound(Track(filePath: 'valid.mp3', fileExtension: '.mp3'));
     yield ScanIssueEvent(kind: ScanIssueKind.metadata, filePath: 'broken.mp3');
     yield ScanCompleted(candidateCount: 2, foundCount: 1);
+  }
+}
+
+/// 途中まで楽曲を返してから失敗するスキャン。
+class _PartialThenFailScanner implements FileScannerService {
+  @override
+  Stream<ScanEvent> scan(String directoryPath) async* {
+    yield const TrackFound(
+      Track(filePath: '/tmp/partial.mp3', fileExtension: '.mp3'),
+    );
+    throw FolderAccessException(
+      const FileSystemException('permission denied'),
+      StackTrace.current,
+    );
   }
 }
 

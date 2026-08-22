@@ -50,6 +50,7 @@ class LibraryViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? _warningTitle;
   String? _warningMessage;
+  int _failureRevision = 0;
   bool _initialized = false;
 
   LibraryStatus get status => _status;
@@ -58,6 +59,7 @@ class LibraryViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get warningTitle => _warningTitle;
   String? get warningMessage => _warningMessage;
+  int get failureRevision => _failureRevision;
 
   /// 楽曲一覧を表示できる状態かどうか。`ready` と `readyWithWarnings` は
   /// 警告の有無が違うだけで、一覧の表示可否としては同じ扱いになる。
@@ -94,6 +96,7 @@ class LibraryViewModel extends ChangeNotifier {
   }
 
   Future<void> chooseAndScanFolder() async {
+    final preserveExistingTracks = canShowTracks;
     final String? selectedPath;
     final Uint8List? bookmark;
     try {
@@ -101,7 +104,10 @@ class LibraryViewModel extends ChangeNotifier {
       if (selectedPath == null) return;
       bookmark = await _bookmarkService.createBookmark(selectedPath);
     } on Object {
-      _setError('フォルダを登録できませんでした。');
+      _reportFailure(
+        'フォルダを登録できませんでした。',
+        preserveExistingTracks: preserveExistingTracks,
+      );
       return;
     }
     await registerAndScan(selectedPath, securityScopedBookmark: bookmark);
@@ -111,13 +117,21 @@ class LibraryViewModel extends ChangeNotifier {
     String path, {
     Uint8List? securityScopedBookmark,
   }) async {
+    final previousStatus = _status;
+    final preserveExistingTracks = canShowTracks;
     final validationError = await _validateDirectory(path);
     if (validationError != null) {
-      _setError(validationError);
+      _reportFailure(
+        validationError,
+        preserveExistingTracks: preserveExistingTracks,
+      );
       return;
     }
     if (p.equals(path, _repository.registeredFolder ?? '')) {
-      _setError('このフォルダはすでに登録されています。');
+      _reportFailure(
+        'このフォルダはすでに登録されています。',
+        preserveExistingTracks: preserveExistingTracks,
+      );
       return;
     }
 
@@ -145,7 +159,11 @@ class LibraryViewModel extends ChangeNotifier {
         _status = LibraryStatus.empty;
       } else if (tracks.isEmpty && metadataIssueCount > 0) {
         _restoreTracksFromRepository();
-        _setError('音楽ファイルのメタデータを解析できませんでした。');
+        _reportFailure(
+          '音楽ファイルのメタデータを解析できませんでした。',
+          preserveExistingTracks: preserveExistingTracks,
+          preservedStatus: previousStatus,
+        );
         return;
       } else if (metadataIssueCount > 0) {
         _status = LibraryStatus.readyWithWarnings;
@@ -164,10 +182,18 @@ class LibraryViewModel extends ChangeNotifier {
       notifyListeners();
     } on FolderAccessException {
       _restoreTracksFromRepository();
-      _setError('フォルダにアクセスできません。権限を確認してください。');
+      _reportFailure(
+        'フォルダにアクセスできません。権限を確認してください。',
+        preserveExistingTracks: preserveExistingTracks,
+        preservedStatus: previousStatus,
+      );
     } on Object {
       _restoreTracksFromRepository();
-      _setError('フォルダのスキャンに失敗しました。');
+      _reportFailure(
+        'フォルダのスキャンに失敗しました。',
+        preserveExistingTracks: preserveExistingTracks,
+        preservedStatus: previousStatus,
+      );
     }
   }
 
@@ -238,6 +264,23 @@ class LibraryViewModel extends ChangeNotifier {
     _status = LibraryStatus.error;
     _errorMessage = message;
     notifyListeners();
+  }
+
+  void _reportFailure(
+    String message, {
+    bool preserveExistingTracks = false,
+    LibraryStatus? preservedStatus,
+  }) {
+    if (preserveExistingTracks || canShowTracks) {
+      if (preserveExistingTracks && preservedStatus != null) {
+        _status = preservedStatus;
+      }
+      _errorMessage = message;
+      _failureRevision++;
+      notifyListeners();
+      return;
+    }
+    _setError(message);
   }
 
   void _setWarning({required String title, required String message}) {

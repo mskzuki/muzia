@@ -140,7 +140,7 @@ void main() {
     expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
   });
 
-  test('スキャン失敗後は楽曲一覧を永続層の内容へ戻す', () async {
+  test('スキャン失敗後は既存の楽曲一覧と表示可能状態を保つ', () async {
     final directory = await Directory.systemTemp.createTemp(
       'muzia-library-test-',
     );
@@ -156,13 +156,13 @@ void main() {
 
     await viewModel.registerAndScan(directory.path);
 
-    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.status, LibraryStatus.ready);
     expect(viewModel.errorMessage, 'フォルダにアクセスできません。権限を確認してください。');
     expect(viewModel.tracks, [savedTrack]);
     expect(repository.registeredFolder, '/tmp/saved');
   });
 
-  test('解析全件失敗でも楽曲一覧を永続層の内容へ戻す', () async {
+  test('解析全件失敗でも既存の楽曲一覧と表示可能状態を保つ', () async {
     final directory = await Directory.systemTemp.createTemp(
       'muzia-library-test-',
     );
@@ -178,8 +178,27 @@ void main() {
 
     await viewModel.registerAndScan(directory.path);
 
-    expect(viewModel.status, LibraryStatus.error);
+    expect(viewModel.status, LibraryStatus.ready);
     expect(viewModel.tracks, [savedTrack]);
+  });
+
+  test('同じ登録失敗でもfailureRevisionを毎回増やす', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'muzia-library-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    const savedTrack = Track(filePath: '/tmp/saved.mp3', fileExtension: '.mp3');
+    final repository = InMemoryMusicRepository();
+    await repository.registerFolder(directory.path, const [savedTrack]);
+    final viewModel = LibraryViewModel(repository: repository);
+    await viewModel.initialize();
+
+    await viewModel.registerAndScan(directory.path);
+    await viewModel.registerAndScan(directory.path);
+
+    expect(viewModel.status, LibraryStatus.ready);
+    expect(viewModel.tracks, [savedTrack]);
+    expect(viewModel.failureRevision, 2);
   });
 
   test('フォルダのアクセス権を復元できない場合も楽曲一覧を表示する', () async {

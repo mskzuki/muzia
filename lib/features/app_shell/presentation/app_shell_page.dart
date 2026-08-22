@@ -44,6 +44,16 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      libraryViewModelProvider.select((viewModel) => viewModel.failureRevision),
+      (previous, next) {
+        final message = ref.read(libraryViewModelProvider).errorMessage;
+        if (message == null) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      },
+    );
     final viewModel = ref.watch(appShellViewModelProvider);
     final libraryViewModel = ref.watch(libraryViewModelProvider);
     final playerViewModel = ref.watch(playerViewModelProvider);
@@ -228,8 +238,7 @@ class _MainContent extends StatelessWidget {
               message: libraryViewModel.errorMessage ?? 'ライブラリを読み込めませんでした。',
             ),
             // 一覧を表示できる2つの状態は、検索0件の扱いも同じ。
-            LibraryStatus.ready ||
-            LibraryStatus.readyWithWarnings =>
+            LibraryStatus.ready || LibraryStatus.readyWithWarnings =>
               searchQuery.trim().isNotEmpty && visibleTracks.isEmpty
                   ? const _StatusMessage(
                       icon: Icons.search_off,
@@ -249,7 +258,9 @@ class _MainContent extends StatelessWidget {
     // 警告は一覧の外に出す。検索0件の空状態でも通知が消えないようにする。
     final warningMessage = libraryViewModel.warningMessage;
     final showsWarning =
-        showsLibrary && libraryViewModel.canShowTracks && warningMessage != null;
+        showsLibrary &&
+        libraryViewModel.canShowTracks &&
+        warningMessage != null;
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(

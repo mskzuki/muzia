@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:muzia/shared/theme/muzia_theme.dart';
 import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/track.dart';
 
@@ -76,43 +77,62 @@ class _ArtistList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: MuziaSpacing.s2),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
           child: Text(
             'アーティスト',
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: MuziaTextStyles.screenTitle.copyWith(
+              color: colors.fgPrimary,
+            ),
           ),
         ),
         ...artists.map((artist) {
           final artistTracks = tracks
               .where((track) => !track.isRemoved && track.artist == artist)
               .length;
+          final selected = artist == selectedArtist;
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 18,
               vertical: 4,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(MuziaRadius.r2),
             ),
-            selected: artist == selectedArtist,
-            selectedTileColor: const Color(0x1F3E63DD),
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF5C6380),
-              child: Icon(Icons.person_outline, color: Colors.white70),
+            selected: selected,
+            selectedTileColor: colors.accentSoft,
+            hoverColor: colors.rowHover,
+            leading: CircleAvatar(
+              backgroundColor: colors.rowHover,
+              child: Icon(
+                Icons.person_outline,
+                size: 20,
+                color: colors.fgTertiary,
+              ),
             ),
             title: Text(
               artist,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: selected ? colors.accentText : colors.fgPrimary,
+              ),
             ),
             subtitle: Text(
               '$artistTracks曲',
-              style: const TextStyle(fontSize: 12),
+              style: MuziaTextStyles.secondary.copyWith(
+                color: colors.fgSecondary,
+              ),
             ),
-            trailing: const Icon(Icons.chevron_right, size: 18),
+            trailing: Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: colors.fgTertiary,
+            ),
             onTap: () => onSelected(artist),
           );
         }),
@@ -138,39 +158,43 @@ class _ArtistDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
       children: [
         Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 48,
-              backgroundColor: Color(0xFF5C6380),
-              child: Icon(Icons.person, size: 42, color: Colors.white70),
+              backgroundColor: colors.rowHover,
+              child: Icon(Icons.person, size: 42, color: colors.fgTertiary),
             ),
             const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'アーティスト',
-                    style: TextStyle(
-                      color: Color(0xFF3A5BC7),
-                      fontSize: 11,
+                    style: MuziaTextStyles.caption.copyWith(
+                      color: colors.accentText,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
                     ),
                   ),
                   Text(
                     artist,
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: MuziaTextStyles.heroTitle.copyWith(
+                      color: colors.fgPrimary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '${albums.length}アルバム · ${songs.length}曲',
-                    style: const TextStyle(color: Color(0xFF646464)),
+                    style: MuziaTextStyles.body.copyWith(
+                      color: colors.fgSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -180,9 +204,9 @@ class _ArtistDetail extends StatelessWidget {
         const SizedBox(height: 28),
         Text(
           'アルバム',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: MuziaTextStyles.sectionTitle.copyWith(
+            color: colors.fgPrimary,
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -203,9 +227,9 @@ class _ArtistDetail extends StatelessWidget {
           const SizedBox(height: 28),
           Text(
             '楽曲',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: MuziaTextStyles.sectionTitle.copyWith(
+              color: colors.fgPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           ...songs.asMap().entries.map(
@@ -244,10 +268,11 @@ class _AlbumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
     return SizedBox(
       width: 150,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(MuziaRadius.r4),
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,25 +282,24 @@ class _AlbumCard extends StatelessWidget {
                 aspectRatio: 1,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4C536F), Color(0xFF8B91AE)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.rowHover,
+                    borderRadius: BorderRadius.circular(MuziaRadius.r4),
                     border: selected
-                        ? Border.all(color: const Color(0xFF3E63DD), width: 2)
-                        : null,
+                        ? Border.all(color: colors.accent, width: 2)
+                        : Border.all(color: colors.borderSubtle),
                     boxShadow: const [
+                      // shadow-2: カード・カバー用の弱い影
                       BoxShadow(
-                        color: Color(0x22000000),
+                        color: Color(0x1A000000),
                         blurRadius: 3,
                         offset: Offset(0, 1),
                       ),
                     ],
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.album_outlined,
                     size: 42,
-                    color: Colors.white54,
+                    color: colors.fgTertiary,
                   ),
                 ),
               ),
@@ -285,13 +309,17 @@ class _AlbumCard extends StatelessWidget {
               album,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              style: MuziaTextStyles.rowTitle.copyWith(
+                color: colors.fgPrimary,
+              ),
             ),
             Text(
               artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF646464)),
+              style: MuziaTextStyles.secondary.copyWith(
+                color: colors.fgSecondary,
+              ),
             ),
           ],
         ),

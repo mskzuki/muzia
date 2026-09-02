@@ -27,6 +27,9 @@ void main() {
       MuziaApp(libraryViewModel: library, playerViewModel: player),
     );
     await tester.pump(const Duration(milliseconds: 300));
+    // デザインハンドオフ準拠: シングルクリックは選択、ダブルクリックで再生。
+    await tester.tap(find.text('Neon Hours'));
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.text('Neon Hours'));
     await tester.pump();
     expect(find.byTooltip('一時停止'), findsOneWidget);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
 import 'package:muzia/features/library/domain/track.dart';
+import 'package:muzia/shared/theme/muzia_theme.dart';
 
 void main() {
   final tracks = [
@@ -60,6 +61,7 @@ void main() {
   testWidgets('アーティスト、アルバム、楽曲を順に表示する', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: MuziaTheme.light(),
         home: Scaffold(body: ArtistAlbumBrowser(tracks: tracks)),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:muzia/app/providers.dart';
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
+import 'package:muzia/shared/theme/muzia_theme.dart';
 
 void runMuziaApp({
   AppShellViewModel? viewModel,
@@ -45,10 +46,8 @@ class MuziaApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Muzia',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-          useMaterial3: true,
-        ),
+        theme: MuziaTheme.light(),
+        darkTheme: MuziaTheme.dark(),
         home: const AppShellPage(),
       ),
     );

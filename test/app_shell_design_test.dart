@@ -81,22 +81,48 @@ void main() {
       find.descendant(of: sidebar, matching: find.byIcon(Icons.music_note)),
       findsOneWidget,
     );
-    // 楽曲数のバッジ
+    // 楽曲 / アーティスト / アルバムの3項目に件数（桁区切り・tabular）
+    for (final item in ['library', 'artists', 'albums']) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('sidebar-item-$item')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+        reason: item,
+      );
+    }
     expect(
-      find.descendant(of: sidebar, matching: find.text('2')),
+      find.descendant(of: sidebar, matching: find.text('アーティスト')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: sidebar,
-        matching: find.text('アーティスト / アルバム'),
-      ),
+      find.descendant(of: sidebar, matching: find.text('アルバム')),
       findsOneWidget,
     );
+    expect(find.text('アーティスト / アルバム'), findsNothing);
     expect(
       find.descendant(of: sidebar, matching: find.text('フォルダを登録')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('サイドバーの「アルバム」はアーティスト/アルバムブラウザを開く', (tester) async {
+    final library = await _libraryWithTracks();
+    await tester.pumpWidget(MuziaApp(libraryViewModel: library));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('sidebar-item-albums')));
+    await tester.pumpAndSettle();
+
+    // ツールバーのタイトルが切り替わり、ブラウザ（アーティスト一覧）が表示される
+    final toolbar = find.byType(AppBar);
+    expect(
+      find.descendant(of: toolbar, matching: find.text('アルバム')),
+      findsOneWidget,
+    );
+    expect(find.text('Midnight Arcade'), findsOneWidget);
+    expect(find.byKey(const ValueKey('track-row-0')), findsNothing);
   });
 
   testWidgets('空状態はアクセントのグリフとフォルダ登録ボタンを表示する', (tester) async {

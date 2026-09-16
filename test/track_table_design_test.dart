@@ -81,8 +81,16 @@ void main() {
 
     expect(find.text('#'), findsOneWidget);
     expect(find.text('タイトル'), findsOneWidget);
-    expect(find.text('アーティスト'), findsOneWidget);
-    expect(find.text('アルバム'), findsOneWidget);
+    // 「アーティスト」「アルバム」はサイドバー項目にもあるため、ヘッダセルに限定する
+    for (final (field, label) in [('artist', 'アーティスト'), ('album', 'アルバム')]) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('sort-$field')),
+          matching: find.text(label),
+        ),
+        findsOneWidget,
+      );
+    }
     expect(find.text('時間'), findsOneWidget);
     // 時間列は m:ss、未取得は「—」
     expect(find.text('3:58'), findsOneWidget);

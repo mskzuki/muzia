@@ -37,7 +37,12 @@ void main() {
 
     await tester.pumpWidget(MuziaApp(libraryViewModel: libraryViewModel));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('アーティスト / アルバム'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('sidebar')),
+        matching: find.text('アーティスト'),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Beta'), findsWidgets);

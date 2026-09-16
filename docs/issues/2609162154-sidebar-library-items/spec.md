@@ -35,6 +35,10 @@ Genres と PLAYLISTS セクションはMVP後（requirements.md §7）のため�
 2. **件数の定義**: アーティスト数・アルバム数は `LibraryCatalog` の集約（削除済み
    楽曲を除く）を用いる。
 
+2026-09-16 の合意: 確認事項1 は「アーティスト/アルバムブラウザを開く」（グリッド画面は
+MVP後）、確認事項2 は記載どおり `LibraryCatalog.artists` / `LibraryCatalog.albums` の件数。
+桁区切りは `lib/shared/format/count_format.dart` の `formatCount` で行う。
+
 ## 要件
 
 1. サイドバーの LIBRARY セクションを「楽曲 / アーティスト / アルバム」の3項目にし、

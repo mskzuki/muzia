@@ -20,9 +20,12 @@ import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/domain/track_sort.dart';
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
+import 'package:muzia/shared/format/count_format.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
 
-enum _LibrarySection { library, artistAlbum }
+/// サイドバーのライブラリ項目。「アーティスト」「アルバム」はどちらも
+/// アーティスト/アルバムブラウザを開く（アルバム単独のグリッド画面はMVP後）。
+enum _LibrarySection { library, artists, albums }
 
 class AppShellPage extends ConsumerStatefulWidget {
   const AppShellPage({super.key});
@@ -67,9 +70,12 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
     final libraryViewModel = ref.watch(libraryViewModelProvider);
     final playerViewModel = ref.watch(playerViewModelProvider);
     final colors = Theme.of(context).extension<MuziaColors>()!;
-    final sectionTitle = _section == _LibrarySection.library
-        ? '楽曲'
-        : 'アーティスト / アルバム';
+    final sectionTitle = switch (_section) {
+      _LibrarySection.library => '楽曲',
+      _LibrarySection.artists => 'アーティスト',
+      _LibrarySection.albums => 'アルバム',
+    };
+    final catalog = LibraryCatalog(libraryViewModel.tracks);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 52,
@@ -154,6 +160,12 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
                   trackCount: libraryViewModel.canShowTracks
                       ? libraryViewModel.tracks.length
                       : null,
+                  artistCount: libraryViewModel.canShowTracks
+                      ? catalog.artists.length
+                      : null,
+                  albumCount: libraryViewModel.canShowTracks
+                      ? catalog.albums.length
+                      : null,
                   onSectionChanged: (section) =>
                       setState(() => _section = section),
                 ),
@@ -184,6 +196,8 @@ class _Sidebar extends StatelessWidget {
     required this.onPickFolder,
     required this.section,
     required this.trackCount,
+    required this.artistCount,
+    required this.albumCount,
     required this.onSectionChanged,
   });
 
@@ -192,6 +206,8 @@ class _Sidebar extends StatelessWidget {
   final Future<void> Function() onPickFolder;
   final _LibrarySection section;
   final int? trackCount;
+  final int? artistCount;
+  final int? albumCount;
   final ValueChanged<_LibrarySection> onSectionChanged;
 
   @override
@@ -223,6 +239,7 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
               _SidebarItem(
+                key: const ValueKey('sidebar-item-library'),
                 icon: Icons.music_note,
                 label: '楽曲',
                 count: trackCount,
@@ -231,11 +248,21 @@ class _Sidebar extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               _SidebarItem(
+                key: const ValueKey('sidebar-item-artists'),
                 icon: Icons.person_outline,
-                label: 'アーティスト / アルバム',
-                count: null,
-                selected: section == _LibrarySection.artistAlbum,
-                onTap: () => onSectionChanged(_LibrarySection.artistAlbum),
+                label: 'アーティスト',
+                count: artistCount,
+                selected: section == _LibrarySection.artists,
+                onTap: () => onSectionChanged(_LibrarySection.artists),
+              ),
+              const SizedBox(height: 2),
+              _SidebarItem(
+                key: const ValueKey('sidebar-item-albums'),
+                icon: Icons.album_outlined,
+                label: 'アルバム',
+                count: albumCount,
+                selected: section == _LibrarySection.albums,
+                onTap: () => onSectionChanged(_LibrarySection.albums),
               ),
               const Spacer(),
               OutlinedButton.icon(
@@ -261,6 +288,7 @@ class _Sidebar extends StatelessWidget {
 
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
+    super.key,
     required this.icon,
     required this.label,
     required this.count,
@@ -301,9 +329,12 @@ class _SidebarItem extends StatelessWidget {
               ),
               if (count != null)
                 Text(
-                  '$count',
-                  style: MuziaTextStyles.secondary.copyWith(
-                    color: selected ? fg : colors.fgTertiary,
+                  formatCount(count!),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: selected
+                        ? fg.withValues(alpha: 0.75)
+                        : colors.fgTertiary,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -340,8 +371,7 @@ class _MainContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (section == _LibrarySection.artistAlbum &&
-        libraryViewModel.canShowTracks) {
+    if (section != _LibrarySection.library && libraryViewModel.canShowTracks) {
       return Padding(
         padding: const EdgeInsets.all(MuziaSpacing.s6),
         child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),

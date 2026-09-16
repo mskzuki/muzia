@@ -48,6 +48,8 @@ class MuziaApp extends StatelessWidget {
         title: 'Muzia',
         theme: MuziaTheme.light(),
         darkTheme: MuziaTheme.dark(),
+        // OSの外観設定に関わらずライト表示に固定する（課題 2609162254）
+        themeMode: ThemeMode.light,
         home: const AppShellPage(),
       ),
     );

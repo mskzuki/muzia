@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muzia/app/app.dart';
+import 'package:muzia/features/app_shell/presentation/app_shell_page.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
 
 void main() {
@@ -36,10 +37,66 @@ void main() {
       expect(colors.destructive, const Color(0xFFCE2C31));
     });
 
+    test('スクリム・バッジ・スライダー・半透明面の補助トークンを公開する', () {
+      expect(colors.warnTextStrong, const Color(0xFF4F3422));
+      expect(colors.alertBadge, const Color(0xFFE5484D));
+      expect(colors.overlay.a, closeTo(0.30, 0.02));
+      expect(colors.panelTranslucent.a, closeTo(0.70, 0.02));
+      expect(colors.sliderTrack.a, closeTo(0.08, 0.01));
+    });
+
     test('ThemeDataへトークンを反映する', () {
       expect(theme.brightness, Brightness.light);
       expect(theme.colorScheme.primary, colors.accent);
       expect(theme.scaffoldBackgroundColor, colors.windowBg);
+      expect(theme.dialogTheme.barrierColor, colors.overlay);
+    });
+  });
+
+  group('MuziaShadows / MuziaMotion', () {
+    test('shadow-2 / shadow-3 をデザイントークンの値で定義する', () {
+      expect(MuziaShadows.card.single.blurRadius, 3);
+      expect(MuziaShadows.card.single.offset, const Offset(0, 1));
+      expect(MuziaShadows.card.single.color.a, closeTo(0.10, 0.01));
+      expect(MuziaShadows.raised.single.blurRadius, 12);
+      expect(MuziaShadows.raised.single.offset, const Offset(0, 4));
+      expect(MuziaShadows.raised.single.color.a, closeTo(0.14, 0.01));
+    });
+
+    test('開閉のdurationとカーブを定義する', () {
+      expect(MuziaMotion.open, const Duration(milliseconds: 160));
+      expect(MuziaMotion.close, const Duration(milliseconds: 100));
+      expect(MuziaMotion.curve, const Cubic(0.16, 1, 0.3, 1));
+    });
+
+    testWidgets('Reduce Motion時はdurationをゼロにする', (tester) async {
+      late Duration normal;
+      late Duration reduced;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Column(
+            children: [
+              Builder(
+                builder: (context) {
+                  normal = MuziaMotion.resolve(context, MuziaMotion.open);
+                  return const SizedBox.shrink();
+                },
+              ),
+              MediaQuery(
+                data: const MediaQueryData(disableAnimations: true),
+                child: Builder(
+                  builder: (context) {
+                    reduced = MuziaMotion.resolve(context, MuziaMotion.open);
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      expect(normal, MuziaMotion.open);
+      expect(reduced, Duration.zero);
     });
   });
 
@@ -53,6 +110,13 @@ void main() {
       expect(colors.fgPrimary, const Color(0xFFEEEEEE));
       expect(colors.windowBg, const Color(0xFF111111));
     });
+
+    test('スクリムはダークでより濃く、補助トークンもダーク値を持つ', () {
+      expect(colors.overlay.a, greaterThan(MuziaColors.light.overlay.a));
+      expect(colors.warnTextStrong, const Color(0xFFFFE7B3));
+      expect(colors.alertBadge, MuziaColors.light.alertBadge);
+      expect(theme.dialogTheme.barrierColor, colors.overlay);
+    });
   });
 
   test('スペーシングは4pxスケールで定義する', () {
@@ -64,13 +128,48 @@ void main() {
     expect(MuziaSpacing.s6, 32);
   });
 
-  testWidgets('アプリにライト/ダーク両方のMuziaテーマが設定される', (tester) async {
+  testWidgets('アプリにライト/ダーク両方のMuziaテーマが設定され、表示はライトに固定される', (tester) async {
     await tester.pumpWidget(const MuziaApp());
     await tester.pumpAndSettle();
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.extension<MuziaColors>(), MuziaColors.light);
     expect(app.darkTheme?.extension<MuziaColors>(), MuziaColors.dark);
+    expect(app.themeMode, ThemeMode.light);
+  });
+
+  testWidgets('OSがダークモードでもライトテーマで描画される', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+    await tester.pumpWidget(const MuziaApp());
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(AppShellPage));
+    expect(Theme.of(context).brightness, Brightness.light);
+    expect(Theme.of(context).extension<MuziaColors>(), MuziaColors.light);
+  });
+
+  testWidgets('ダイアログのスクリムに overlay トークンが使われる', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MuziaTheme.light(),
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => const AlertDialog(title: Text('dialog')),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final barrier = tester.widget<ModalBarrier>(find.byType(ModalBarrier).last);
+    expect(barrier.color, MuziaColors.light.overlay);
   });
 
   test('角丸はデザイントークンの段階で定義する', () {

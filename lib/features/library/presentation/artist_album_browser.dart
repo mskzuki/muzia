@@ -204,9 +204,7 @@ class _ArtistDetail extends StatelessWidget {
         const SizedBox(height: 28),
         Text(
           'アルバム',
-          style: MuziaTextStyles.sectionTitle.copyWith(
-            color: colors.fgPrimary,
-          ),
+          style: MuziaTextStyles.sectionTitle.copyWith(color: colors.fgPrimary),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -287,14 +285,7 @@ class _AlbumCard extends StatelessWidget {
                     border: selected
                         ? Border.all(color: colors.accent, width: 2)
                         : Border.all(color: colors.borderSubtle),
-                    boxShadow: const [
-                      // shadow-2: カード・カバー用の弱い影
-                      BoxShadow(
-                        color: Color(0x1A000000),
-                        blurRadius: 3,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
+                    boxShadow: MuziaShadows.card,
                   ),
                   child: Icon(
                     Icons.album_outlined,
@@ -309,9 +300,7 @@ class _AlbumCard extends StatelessWidget {
               album,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: MuziaTextStyles.rowTitle.copyWith(
-                color: colors.fgPrimary,
-              ),
+              style: MuziaTextStyles.rowTitle.copyWith(color: colors.fgPrimary),
             ),
             Text(
               artist,

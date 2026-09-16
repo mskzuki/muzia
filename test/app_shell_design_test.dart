@@ -60,6 +60,18 @@ void main() {
     expect(find.text('楽曲'), findsWidgets);
     expect(find.text('2曲'), findsOneWidget);
     expect(find.byKey(const ValueKey('library-search')), findsOneWidget);
+    // 検索フィールドは 196×26
+    expect(
+      tester.getSize(find.byKey(const ValueKey('search-field'))),
+      const Size(196, 26),
+    );
+    // タイトルはサイドバー（224px）の右、コンテンツ列の上に置く
+    final titleLeft = tester
+        .getTopLeft(
+          find.descendant(of: find.byType(AppBar), matching: find.text('楽曲')),
+        )
+        .dx;
+    expect(titleLeft, greaterThanOrEqualTo(224));
 
     final toolbar = tester.widget<AppBar>(find.byType(AppBar));
     expect(toolbar.toolbarHeight, 52);
@@ -136,6 +148,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('ライブラリは空です'), findsOneWidget);
+    // グリフの角丸は radius-5（12px）
+    final glyph = tester.widget<Container>(
+      find.descendant(of: empty, matching: find.byType(Container)).first,
+    );
+    expect(
+      (glyph.decoration as BoxDecoration).borderRadius,
+      BorderRadius.circular(MuziaRadius.r5),
+    );
     // 空状態からもフォルダ登録を実行できる（サイドバーと合わせて2箇所）
     expect(
       find.descendant(of: empty, matching: find.text('フォルダを登録')),
@@ -171,6 +191,18 @@ void main() {
       ),
       findsOneWidget,
     );
+    // 本文は amber-12、リード（タイトル）は bold、下罫線は amber-a5
+    final texts = tester.widgetList<Text>(
+      find.descendant(of: banner, matching: find.byType(Text)),
+    );
+    expect(texts.first.style?.fontWeight, FontWeight.w700);
+    for (final text in texts) {
+      expect(text.style?.color, MuziaColors.light.warnTextStrong);
+    }
+    expect(
+      (container.decoration as BoxDecoration).border?.bottom.color,
+      MuziaColors.light.warnBorder,
+    );
   });
 
   testWidgets('プレイヤーバーはtransport配置で再生・一時停止できる', (tester) async {
@@ -183,7 +215,8 @@ void main() {
     expect(bar, findsOneWidget);
     expect(tester.getSize(bar).height, 74);
     expect(find.text('Neon Hours'), findsOneWidget);
-    expect(find.text('Midnight Arcade'), findsOneWidget);
+    // 2行目は「アーティスト — アルバム」
+    expect(find.text('Midnight Arcade — Parallel Lines'), findsOneWidget);
     // 前後スキップは未対応のため無効状態で配置する
     final prev = tester.widget<IconButton>(
       find.byKey(const ValueKey('playback-previous')),

@@ -83,9 +83,11 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         shape: Border(bottom: BorderSide(color: colors.borderSubtle)),
-        titleSpacing: MuziaSpacing.s4,
+        titleSpacing: 0,
         title: Row(
           children: [
+            // タイトルはサイドバー幅の右、コンテンツ列の上に置く（戻る/進むは見送り）。
+            const SizedBox(width: 224 + 18),
             Text(
               sectionTitle,
               style: MuziaTextStyles.windowTitle.copyWith(
@@ -95,58 +97,25 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
             if (libraryViewModel.canShowTracks) ...[
               const SizedBox(width: MuziaSpacing.s2),
               Text(
-                '${libraryViewModel.tracks.length}曲',
+                '${formatCount(libraryViewModel.tracks.length)}曲',
                 style: MuziaTextStyles.secondary.copyWith(
-                  color: colors.fgSecondary,
+                  color: colors.fgTertiary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
           ],
         ),
         actions: [
-          SizedBox(
-            width: 240,
-            height: 30,
-            child: TextField(
-              key: const ValueKey('library-search'),
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              style: MuziaTextStyles.body.copyWith(color: colors.fgPrimary),
-              decoration: InputDecoration(
-                hintText: '検索',
-                hintStyle: MuziaTextStyles.body.copyWith(
-                  color: colors.fgTertiary,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 16,
-                  color: colors.fgTertiary,
-                ),
-                suffixIcon: _searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear, size: 16),
-                        color: colors.fgTertiary,
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      ),
-                filled: true,
-                fillColor: colors.windowBg,
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(MuziaRadius.r3),
-                  borderSide: BorderSide(color: colors.borderSubtle),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(MuziaRadius.r3),
-                  borderSide: BorderSide(color: colors.accent, width: 2),
-                ),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
+          _SearchField(
+            controller: _searchController,
+            query: _searchQuery,
+            onChanged: (value) => setState(() => _searchQuery = value),
+            onClear: () {
+              _searchController.clear();
+              setState(() => _searchQuery = '');
+            },
           ),
-          const SizedBox(width: MuziaSpacing.s4),
         ],
       ),
       body: Column(
@@ -470,7 +439,9 @@ class _WarningNotice extends StatelessWidget {
         width: double.infinity,
         decoration: BoxDecoration(
           color: colors.warnSurface,
-          border: Border(bottom: BorderSide(color: colors.borderSubtle)),
+          border: Border(
+            bottom: BorderSide(color: colors.warnBorder, width: 0.5),
+          ),
         ),
         padding: const EdgeInsets.symmetric(
           horizontal: MuziaSpacing.s4,
@@ -486,14 +457,21 @@ class _WarningNotice extends StatelessWidget {
             const SizedBox(width: MuziaSpacing.s2),
             Text(
               title,
-              style: MuziaTextStyles.rowTitle.copyWith(color: colors.warnText),
+              style: MuziaTextStyles.body.copyWith(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: colors.warnTextStrong,
+              ),
             ),
             const SizedBox(width: MuziaSpacing.s2),
             Expanded(
               child: Text(
                 message,
                 overflow: TextOverflow.ellipsis,
-                style: MuziaTextStyles.body.copyWith(color: colors.warnText),
+                style: MuziaTextStyles.body.copyWith(
+                  fontSize: 12.5,
+                  color: colors.warnTextStrong,
+                ),
               ),
             ),
           ],
@@ -546,7 +524,7 @@ class _EmptyLibrary extends StatelessWidget {
           height: 96,
           decoration: BoxDecoration(
             color: colors.accentSoft,
-            borderRadius: BorderRadius.circular(MuziaRadius.r6),
+            borderRadius: BorderRadius.circular(MuziaRadius.r5),
           ),
           child: Icon(Icons.music_note, size: 40, color: colors.accent),
         ),
@@ -766,31 +744,24 @@ class _TrackTableState extends State<_TrackTable> {
         PopupMenuItem(
           value: 'play',
           height: 32,
-          child: Text('曲を再生', style: MuziaTextStyles.body),
+          child: _MenuLabel(icon: Icons.play_arrow, label: '曲を再生'),
         ),
         PopupMenuItem(
           value: 'edit',
           height: 32,
-          child: Row(
-            children: [
-              const Expanded(child: Text('曲を編集…', style: MuziaTextStyles.body)),
-              const SizedBox(width: MuziaSpacing.s4),
-              Text(
-                editShortcutLabel,
-                style: MuziaTextStyles.caption.copyWith(
-                  color: colors.fgTertiary,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
+          child: _MenuLabel(
+            icon: Icons.edit_outlined,
+            label: '曲を編集…',
+            shortcut: editShortcutLabel,
           ),
         ),
         PopupMenuItem(
           value: 'remove',
           height: 32,
-          child: Text(
-            'ライブラリから削除…',
-            style: MuziaTextStyles.body.copyWith(color: colors.destructive),
+          child: _MenuLabel(
+            icon: Icons.close,
+            label: 'ライブラリから削除…',
+            color: colors.destructive,
           ),
         ),
       ],
@@ -831,17 +802,21 @@ class _TrackTableState extends State<_TrackTable> {
           children: [
             if (_selectedPaths.length >= 2)
               Container(
-                color: colors.accentSoft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: MuziaSpacing.s4,
-                  vertical: MuziaSpacing.s1,
+                key: const ValueKey('selection-bar'),
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.accentSoft,
+                  border: Border(
+                    bottom: BorderSide(color: colors.accentBorder, width: 0.5),
+                  ),
                 ),
+                padding: const EdgeInsets.fromLTRB(18, 0, 14, 0),
                 child: Row(
                   children: [
                     Text(
-                      '${_selectedPaths.length}曲を選択中',
+                      '${_selectedPaths.length} 曲を選択中',
                       style: MuziaTextStyles.rowTitle.copyWith(
-                        color: colors.accentText,
+                        color: colors.fgPrimary,
                       ),
                     ),
                     const Spacer(),
@@ -850,7 +825,8 @@ class _TrackTableState extends State<_TrackTable> {
                       icon: const Icon(Icons.edit_outlined, size: 14),
                       label: const Text('一括編集'),
                       style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
+                        minimumSize: const Size(0, 28),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         textStyle: MuziaTextStyles.rowTitle,
                       ),
                     ),
@@ -894,6 +870,7 @@ class _TrackTableState extends State<_TrackTable> {
                   onTap: _toggleSort,
                   alignEnd: true,
                 ),
+                trailing: const SizedBox.shrink(),
               ),
             ),
             Expanded(
@@ -1055,6 +1032,7 @@ class _TrackCells extends StatelessWidget {
     required this.artist,
     required this.album,
     required this.time,
+    required this.trailing,
   });
 
   final Widget number;
@@ -1062,6 +1040,9 @@ class _TrackCells extends StatelessWidget {
   final Widget artist;
   final Widget album;
   final Widget time;
+
+  /// 最右列（36px）。行ではケバブ（⋮）、ヘッダでは空。
+  final Widget trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1076,6 +1057,8 @@ class _TrackCells extends StatelessWidget {
         Expanded(flex: 2, child: album),
         const SizedBox(width: MuziaSpacing.s4),
         SizedBox(width: 56, child: time),
+        const SizedBox(width: MuziaSpacing.s2),
+        SizedBox(width: 36, child: trailing),
       ],
     );
   }
@@ -1137,7 +1120,15 @@ class _TrackRowState extends State<_TrackRow> {
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: Container(
-          color: background,
+          decoration: BoxDecoration(
+            color: background,
+            border: Border(
+              bottom: BorderSide(
+                color: selected ? Colors.transparent : colors.rowDivider,
+                width: 0.5,
+              ),
+            ),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
           child: _TrackCells(
             number: widget.playing
@@ -1178,8 +1169,200 @@ class _TrackRowState extends State<_TrackRow> {
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
+            trailing: _KebabButton(
+              key: ValueKey('track-kebab-${widget.index}'),
+              selected: selected,
+              onPressed: widget.onSecondaryDown,
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// ツールバー右端の検索フィールド（`.search` / `.search.on`）。
+///
+/// 196×26・角丸4。非フォーカス時は gray-a3 の塗りで枠なし、フォーカス時は
+/// 白背景＋ヘアライン枠＋アクセントの柔らかいリング。
+class _SearchField extends StatefulWidget {
+  const _SearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  final _focusNode = FocusNode(debugLabel: 'library-search');
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_onFocusChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final focused = _focusNode.hasFocus;
+    return Padding(
+      padding: const EdgeInsets.only(right: MuziaSpacing.s4),
+      child: Container(
+        key: const ValueKey('search-field'),
+        width: 196,
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s2),
+        decoration: BoxDecoration(
+          color: focused ? colors.windowBg : colors.rowHover,
+          borderRadius: BorderRadius.circular(MuziaRadius.r2),
+          border: focused ? Border.all(color: colors.borderSubtle) : null,
+          boxShadow: focused
+              ? [
+                  BoxShadow(
+                    color: colors.accent.withValues(alpha: 0.2),
+                    spreadRadius: 3,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search, size: 14, color: colors.fgTertiary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: TextField(
+                key: const ValueKey('library-search'),
+                controller: widget.controller,
+                focusNode: _focusNode,
+                onChanged: widget.onChanged,
+                style: MuziaTextStyles.body.copyWith(color: colors.fgPrimary),
+                decoration: InputDecoration(
+                  isDense: true,
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: '検索',
+                  hintStyle: MuziaTextStyles.body.copyWith(
+                    color: colors.fgTertiary,
+                  ),
+                ),
+              ),
+            ),
+            if (widget.query.isNotEmpty)
+              GestureDetector(
+                onTap: widget.onClear,
+                child: Icon(Icons.clear, size: 14, color: colors.fgTertiary),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// コンテキストメニュー項目（`.ctx-item`）: 先頭アイコン15px + ラベル + ショートカット。
+class _MenuLabel extends StatelessWidget {
+  const _MenuLabel({
+    required this.icon,
+    required this.label,
+    this.shortcut,
+    this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? shortcut;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return Row(
+      children: [
+        SizedBox(
+          width: 15,
+          child: Icon(icon, size: 14, color: color ?? colors.fgSecondary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: MuziaTextStyles.body.copyWith(
+              color: color ?? colors.fgPrimary,
+            ),
+          ),
+        ),
+        if (shortcut != null) ...[
+          const SizedBox(width: MuziaSpacing.s4),
+          Text(
+            shortcut!,
+            style: MuziaTextStyles.secondary.copyWith(
+              color: colors.fgTertiary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 行右端のケバブ（⋮）。クリックでコンテキストメニューをボタン位置に開く。
+class _KebabButton extends StatefulWidget {
+  const _KebabButton({
+    super.key,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final bool selected;
+  final ValueChanged<Offset> onPressed;
+
+  @override
+  State<_KebabButton> createState() => _KebabButtonState();
+}
+
+class _KebabButtonState extends State<_KebabButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final color = widget.selected
+        ? colors.onAccent.withValues(alpha: 0.82)
+        : _hovered
+        ? colors.fgSecondary
+        : colors.fgTertiary;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          final box = context.findRenderObject()! as RenderBox;
+          widget.onPressed(box.localToGlobal(Offset(0, box.size.height)));
+        },
+        child: Center(child: Icon(Icons.more_vert, size: 16, color: color)),
       ),
     );
   }
@@ -1246,7 +1429,10 @@ class _PlayerArea extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              track.artist ?? 'アーティスト不明',
+                              [
+                                track.artist ?? 'アーティスト不明',
+                                ?track.album,
+                              ].join(' — '),
                               overflow: TextOverflow.ellipsis,
                               style: MuziaTextStyles.secondary.copyWith(
                                 color: colors.fgSecondary,

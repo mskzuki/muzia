@@ -27,6 +27,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     required this.overlay,
     required this.panelTranslucent,
     required this.sliderTrack,
+    required this.rowDivider,
+    required this.accentBorder,
+    required this.warnBorder,
   });
 
   final Color accent;
@@ -63,6 +66,15 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
   /// スライダーのトラック背景（gray-a4）。
   final Color sliderTrack;
 
+  /// テーブル行間のヘアライン（gray-a2）。
+  final Color rowDivider;
+
+  /// アクセント面の縁取り（indigo-a5。選択バーの下罫線など）。
+  final Color accentBorder;
+
+  /// 警告面の縁取り（amber-a5。バナーの下罫線）。
+  final Color warnBorder;
+
   /// Radixライトパレット（indigo / gray / amber / red）。
   static const light = MuziaColors(
     accent: Color(0xFF3E63DD), // indigo-9
@@ -88,6 +100,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     overlay: Color(0x4D000000), // black-a6 ~30%
     panelTranslucent: Color(0xB3FFFFFF), // rgba(255,255,255,0.7)
     sliderTrack: Color(0x14000000), // gray-a4 ~8%
+    rowDivider: Color(0x0A000000), // gray-a2 ~4%
+    accentBorder: Color(0x473E63DD), // indigo-a5 ~28%
+    warnBorder: Color(0x66FFC53D), // amber-a5 ~40%
   );
 
   /// 同じRadixステップのダークパレット値。
@@ -115,6 +130,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     overlay: Color(0x7A000000), // black-a8 ~48%
     panelTranslucent: Color(0x09FFFFFF), // gray-a2 (dark)
     sliderTrack: Color(0x17FFFFFF), // gray-a4 (dark) ~9%
+    rowDivider: Color(0x0AFFFFFF), // gray-a2 (dark)
+    accentBorder: Color(0x663E63DD), // indigo-a5 (dark)
+    warnBorder: Color(0x66FFC53D), // amber-a5 (dark)
   );
 
   @override
@@ -142,6 +160,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     Color? overlay,
     Color? panelTranslucent,
     Color? sliderTrack,
+    Color? rowDivider,
+    Color? accentBorder,
+    Color? warnBorder,
   }) {
     return MuziaColors(
       accent: accent ?? this.accent,
@@ -167,6 +188,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
       overlay: overlay ?? this.overlay,
       panelTranslucent: panelTranslucent ?? this.panelTranslucent,
       sliderTrack: sliderTrack ?? this.sliderTrack,
+      rowDivider: rowDivider ?? this.rowDivider,
+      accentBorder: accentBorder ?? this.accentBorder,
+      warnBorder: warnBorder ?? this.warnBorder,
     );
   }
 
@@ -198,6 +222,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
       overlay: mix(overlay, other.overlay),
       panelTranslucent: mix(panelTranslucent, other.panelTranslucent),
       sliderTrack: mix(sliderTrack, other.sliderTrack),
+      rowDivider: mix(rowDivider, other.rowDivider),
+      accentBorder: mix(accentBorder, other.accentBorder),
+      warnBorder: mix(warnBorder, other.warnBorder),
     );
   }
 }

@@ -110,16 +110,21 @@ void main() {
     await tester.tap(find.text('Neon Hours'));
     await tester.pump();
     // 単一選択では選択バーを表示しない
-    expect(find.text('1曲を選択中'), findsNothing);
+    expect(find.text('1 曲を選択中'), findsNothing);
 
     await _metaTap(tester, find.text('Coastlines'));
-    expect(find.text('2曲を選択中'), findsOneWidget);
+    expect(find.text('2 曲を選択中'), findsOneWidget);
     expect(find.text('一括編集'), findsOneWidget);
+    // 選択バーは高さ44px固定
+    expect(
+      tester.getSize(find.byKey(const ValueKey('selection-bar'))).height,
+      44,
+    );
 
     // 修飾キーなしのクリックで単一選択に戻る
     await tester.tap(find.text('Paper Crowns'));
     await tester.pump();
-    expect(find.text('2曲を選択中'), findsNothing);
+    expect(find.text('2 曲を選択中'), findsNothing);
   });
 
   testWidgets('ダブルクリックで再生する', (tester) async {
@@ -147,10 +152,33 @@ void main() {
     expect(find.text('曲を編集…'), findsOneWidget);
     expect(find.text(_editShortcut), findsOneWidget);
     expect(find.text('ライブラリから削除…'), findsOneWidget);
+    // 各項目の先頭アイコン（プレイヤーバーの再生アイコンと区別するためメニュー内に限定）
+    Finder menuIcon(IconData icon) => find.descendant(
+      of: find.byType(PopupMenuItem<String>),
+      matching: find.byIcon(icon),
+    );
+    expect(menuIcon(Icons.play_arrow), findsOneWidget);
+    expect(menuIcon(Icons.edit_outlined), findsOneWidget);
+    expect(menuIcon(Icons.close), findsOneWidget);
 
     await tester.tap(find.text('曲を編集…'));
     await tester.pumpAndSettle();
     expect(find.text('曲を編集'), findsOneWidget);
+  });
+
+  testWidgets('各行のケバブ（⋮）からもコンテキストメニューを開ける', (tester) async {
+    await _pumpApp(tester);
+
+    expect(find.byIcon(Icons.more_vert), findsNWidgets(3));
+    await tester.tap(find.byKey(const ValueKey('track-kebab-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('曲を再生'), findsOneWidget);
+    await tester.tap(find.text('曲を編集…'));
+    await tester.pumpAndSettle();
+    // ケバブの行（Coastlines）が編集対象になる
+    expect(find.text('曲を編集'), findsOneWidget);
+    expect(find.text('Coastlines — Tidewater'), findsOneWidget);
   });
 
   testWidgets('コンテキストメニューから削除確認を表示する', (tester) async {

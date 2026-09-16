@@ -43,6 +43,9 @@ void main() {
       expect(colors.overlay.a, closeTo(0.30, 0.02));
       expect(colors.panelTranslucent.a, closeTo(0.70, 0.02));
       expect(colors.sliderTrack.a, closeTo(0.08, 0.01));
+      expect(colors.rowDivider.a, closeTo(0.04, 0.01));
+      expect(colors.accentBorder.a, closeTo(0.28, 0.02));
+      expect(colors.warnBorder.a, closeTo(0.40, 0.02));
     });
 
     test('ThemeDataへトークンを反映する', () {

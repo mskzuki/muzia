@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:muzia/features/library/domain/bulk_edit_plan.dart';
+import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
@@ -310,134 +312,344 @@ class _TrackIdentity extends StatelessWidget {
   }
 }
 
-/// 一括編集で対象にできる項目。曲名は楽曲ごとに固有のため含めない。
-const bulkEditableFields = <MetadataField>[
-  MetadataField.artist,
-  MetadataField.album,
-  MetadataField.releaseInfo,
-];
-
-const _bulkFieldLabels = <MetadataField, String>{
-  MetadataField.artist: 'アーティスト',
-  MetadataField.album: 'アルバム名',
-  MetadataField.releaseInfo: 'リリース年',
-};
-
-/// 一括編集の確認表示で使う項目名。
-String bulkFieldLabel(MetadataField field) => _bulkFieldLabels[field]!;
-
+/// アルバム情報の一括編集ダイアログ（`18-bulk-dialog`、ハンドオフ §14）。
+///
+/// 4項目を常時表示し、空欄のままの項目は変更しない。保存すると [BulkEditPlan]
+/// を返し、呼び出し側が確認ダイアログを表示してから適用する。
 class BulkMetadataEditDialog extends StatefulWidget {
-  const BulkMetadataEditDialog({super.key, required this.tracks});
+  const BulkMetadataEditDialog({
+    super.key,
+    required this.tracks,
+    required this.catalog,
+    this.initialRequest,
+  });
 
+  /// 選択中の楽曲。
   final List<Track> tracks;
+
+  /// ライブラリ全体。アルバムの収録曲・既存アルバム名・ジャンル候補の参照に使う。
+  final LibraryCatalog catalog;
+
+  /// 確認ダイアログから「戻る」で再表示するときの入力内容。
+  final BulkEditRequest? initialRequest;
 
   @override
   State<BulkMetadataEditDialog> createState() => _BulkMetadataEditDialogState();
 }
 
 class _BulkMetadataEditDialogState extends State<BulkMetadataEditDialog> {
-  late final Map<MetadataField, TextEditingController> _controllers;
-  final Set<MetadataField> _targetFields = {};
+  late final TextEditingController _artist;
+  late final TextEditingController _album;
+  late final TextEditingController _releaseYear;
+  late final TextEditingController _genre;
+  late bool _includeUnselectedAlbumTracks;
+  String? _albumError;
+  String? _releaseYearError;
 
   @override
   void initState() {
     super.initState();
-    _controllers = {
-      for (final field in bulkEditableFields)
-        field: TextEditingController(text: _sharedValue(field) ?? ''),
-    };
+    final initial = widget.initialRequest;
+    _artist = TextEditingController(text: initial?.artist ?? '');
+    _album = TextEditingController(text: initial?.album ?? '');
+    _releaseYear = TextEditingController(
+      text: initial?.releaseYear?.toString() ?? '',
+    );
+    _genre = TextEditingController(text: initial?.genre ?? '');
+    _includeUnselectedAlbumTracks =
+        initial?.includeUnselectedAlbumTracks ?? false;
+    for (final controller in [_artist, _album, _releaseYear, _genre]) {
+      controller.addListener(_onChanged);
+    }
   }
 
-  /// 選択した全楽曲で値が一致する場合だけ、その値を初期表示する。
-  /// 値が混在する場合は空欄にし、チェックするまで書き込まない。
-  String? _sharedValue(MetadataField field) =>
-      _hasSharedValue(field) ? widget.tracks.first.valueOf(field) : null;
-
-  /// 全楽曲で値が一致するか。全曲が未設定（null）の場合も「一致」とする。
-  /// これを [_sharedValue] の戻り値で判定すると、
-  /// 「全曲が未設定」と「値が混在」を区別できない。
-  bool _hasSharedValue(MetadataField field) =>
-      widget.tracks.map((track) => track.valueOf(field)).toSet().length <= 1;
+  void _onChanged() => setState(() {});
 
   @override
   void dispose() {
-    for (final controller in _controllers.values) {
-      controller.dispose();
-    }
+    _artist.dispose();
+    _album.dispose();
+    _releaseYear.dispose();
+    _genre.dispose();
     super.dispose();
   }
 
-  void _save() {
-    String? valueFor(MetadataField field) {
-      if (!_targetFields.contains(field)) return null;
-      final text = _controllers[field]!.text.trim();
-      return text.isEmpty ? null : text;
-    }
+  /// 選択した全楽曲で値が一致する場合だけ、その値をプレースホルダに出す。
+  /// 値が混在する場合は「複数の値」。
+  String _placeholder(String? Function(Track track) selector) {
+    final values = widget.tracks.map(selector).toSet();
+    if (values.length > 1) return '複数の値';
+    return values.single ?? '';
+  }
 
-    Navigator.of(context).pop(
-      MetadataValues.partial(
-        fields: Set.unmodifiable(_targetFields),
-        artist: valueFor(MetadataField.artist),
-        album: valueFor(MetadataField.album),
-        releaseInfo: valueFor(MetadataField.releaseInfo),
+  /// 選択曲が属する唯一のアルバム名。複数アルバムにまたがる場合は null。
+  String? get _singleSourceAlbum {
+    final albums = widget.tracks.map((track) => track.album).toSet();
+    return albums.length == 1 ? albums.single : null;
+  }
+
+  /// 「選択していない同じアルバムの曲も含めて変更する」を出す条件:
+  /// 選択が単一アルバムの一部である場合のみ（確認事項3: 複数アルバムでは非表示）。
+  bool get _showsIncludeAlbumOption {
+    final album = _singleSourceAlbum;
+    if (album == null) return false;
+    final selectedPaths = widget.tracks.map((track) => track.filePath).toSet();
+    return widget.catalog
+        .tracksFor(album: album)
+        .any((track) => !selectedPaths.contains(track.filePath));
+  }
+
+  static String? _normalize(TextEditingController controller) {
+    final text = controller.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  bool get _hasInput => [
+    _artist,
+    _album,
+    _releaseYear,
+    _genre,
+  ].any((c) => c.text.trim().isNotEmpty);
+
+  void _save() {
+    final yearText = _normalize(_releaseYear);
+    final year = yearText == null ? null : int.tryParse(yearText);
+    if (yearText != null && (year == null || yearText.length != 4)) {
+      setState(() => _releaseYearError = 'リリース年は4桁の数字で入力してください。');
+      return;
+    }
+    final plan = planBulkEdit(
+      selected: widget.tracks,
+      catalog: widget.catalog,
+      request: BulkEditRequest(
+        artist: _normalize(_artist),
+        album: _normalize(_album),
+        releaseYear: year,
+        genre: _normalize(_genre),
+        includeUnselectedAlbumTracks:
+            _showsIncludeAlbumOption && _includeUnselectedAlbumTracks,
       ),
     );
+    if (!plan.isValid) {
+      setState(() => _albumError = plan.error);
+      return;
+    }
+    Navigator.of(context).pop(plan);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('アルバム情報の一括編集'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final genre = _genre.text.trim();
+    final sourceAlbum = _singleSourceAlbum;
+    final albumCount = widget.tracks.map((track) => track.album).toSet().length;
+    final yearPlaceholder = _placeholder(
+      (track) => track.releaseYear?.toString(),
+    );
+    return MuziaDialog(
+      title: 'アルバム情報の一括編集',
+      width: 440,
+      header: Padding(
+        padding: const EdgeInsets.only(top: 9),
+        child: Row(
           children: [
-            Text(
-              '${widget.tracks.length}曲を選択中',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 12),
-            const Text('曲名とトラック番号は、重複を避けるため一括編集できません。'),
-            const SizedBox(height: 4),
-            const Text('チェックした項目だけを変更します。'),
-            for (final field in bulkEditableFields) ...[
-              CheckboxListTile(
-                key: ValueKey('bulk-target-${field.name}'),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-                value: _targetFields.contains(field),
-                title: Text('${_bulkFieldLabels[field]}を変更する'),
-                onChanged: (selected) => setState(() {
-                  if (selected == true) {
-                    _targetFields.add(field);
-                  } else {
-                    _targetFields.remove(field);
-                  }
-                }),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.accentSoft,
+                borderRadius: BorderRadius.circular(999),
               ),
-              TextField(
-                controller: _controllers[field],
-                enabled: _targetFields.contains(field),
-                decoration: InputDecoration(
-                  labelText: _bulkFieldLabels[field],
-                  hintText: _hasSharedValue(field) ? null : '複数の値',
+              child: Text(
+                '${widget.tracks.length} 曲を選択中',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: colors.accentText,
                 ),
               ),
-            ],
+            ),
+            const SizedBox(width: MuziaSpacing.s2),
+            Expanded(
+              child: Text(
+                sourceAlbum ?? '$albumCount 枚のアルバム',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, color: colors.fgTertiary),
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('キャンセル'),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+            decoration: BoxDecoration(
+              color: colors.rowStripe,
+              borderRadius: BorderRadius.circular(MuziaRadius.r3),
+            ),
+            child: Text(
+              '曲名とトラック番号は、重複を避けるため一括編集できません。',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.5,
+                color: colors.fgTertiary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _BulkField(
+            label: 'アーティスト',
+            child: MuziaTextInput(
+              key: const ValueKey('bulk-artist'),
+              controller: _artist,
+              hintText: _placeholder((track) => track.artist),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _BulkField(
+            label: 'アルバム名',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MuziaTextInput(
+                  key: const ValueKey('bulk-album'),
+                  controller: _album,
+                  hintText: _placeholder((track) => track.album),
+                  errorText: _albumError,
+                  onChanged: (_) {
+                    if (_albumError != null) setState(() => _albumError = null);
+                  },
+                ),
+                if (_showsIncludeAlbumOption) ...[
+                  const SizedBox(height: 9),
+                  InkWell(
+                    key: const ValueKey('bulk-include-album'),
+                    borderRadius: BorderRadius.circular(MuziaRadius.r2),
+                    onTap: () => setState(
+                      () => _includeUnselectedAlbumTracks =
+                          !_includeUnselectedAlbumTracks,
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: Checkbox(
+                            value: _includeUnselectedAlbumTracks,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (value) => setState(
+                              () => _includeUnselectedAlbumTracks =
+                                  value ?? false,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: MuziaSpacing.s2),
+                        Text(
+                          '選択していない同じアルバムの曲も含めて変更する',
+                          style: MuziaTextStyles.secondary.copyWith(
+                            color: colors.fgSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _BulkField(
+            label: 'リリース年',
+            child: SizedBox(
+              width: 120,
+              child: MuziaTextInput(
+                key: const ValueKey('bulk-release-year'),
+                controller: _releaseYear,
+                hintText: yearPlaceholder.isEmpty ? 'YYYY' : yearPlaceholder,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
+                errorText: _releaseYearError,
+                onChanged: (_) {
+                  if (_releaseYearError != null) {
+                    setState(() => _releaseYearError = null);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _BulkField(
+            label: 'ジャンル',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MuziaTextInput(
+                  key: const ValueKey('bulk-genre'),
+                  controller: _genre,
+                  hintText: _placeholder((track) => track.genre),
+                ),
+                if (widget.catalog.genres.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final suggestion in widget.catalog.genres)
+                        MuziaChip(
+                          key: ValueKey('bulk-genre-chip-$suggestion'),
+                          label: suggestion,
+                          selected: suggestion == genre,
+                          onTap: () => _genre
+                            ..text = suggestion
+                            ..selection = TextSelection.collapsed(
+                              offset: suggestion.length,
+                            ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      footer: MuziaDialogActions(
+        confirmLabel: '保存',
+        onConfirm: _hasInput ? _save : null,
+      ),
+    );
+  }
+}
+
+/// 一括編集のフォーム項目（`.albf`）。ラベルは 13px/medium の fgSecondary。
+class _BulkField extends StatelessWidget {
+  const _BulkField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: MuziaTextStyles.rowTitle.copyWith(color: colors.fgSecondary),
         ),
-        FilledButton(
-          onPressed: _targetFields.isEmpty ? null : _save,
-          child: const Text('保存'),
-        ),
+        const SizedBox(height: 11),
+        child,
       ],
     );
   }

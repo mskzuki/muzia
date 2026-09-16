@@ -19,6 +19,18 @@ class LibraryCatalog {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
+  /// ライブラリ全体の既存アルバム名（重複なし・大文字小文字を無視してソート）。
+  /// アーティスト未設定の楽曲も対象に含める。
+  List<String> get albums {
+    final values = <String>{};
+    for (final track in _activeTracks) {
+      final album = track.album?.trim();
+      if (album != null && album.isNotEmpty) values.add(album);
+    }
+    return values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
   List<String> albumsFor(String artist) =>
       _values((track) => track.artist == artist ? track.album : null);
 

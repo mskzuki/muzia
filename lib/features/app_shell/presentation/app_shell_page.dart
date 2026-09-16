@@ -9,7 +9,9 @@ import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart'
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
+import 'package:muzia/features/library/presentation/bulk_edit_confirm_dialog.dart';
 import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
+import 'package:muzia/features/library/domain/bulk_edit_plan.dart';
 import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/library_search.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
@@ -386,7 +388,7 @@ class _MainContent extends StatelessWidget {
           )
         : _TrackTable(
             tracks: visibleTracks,
-            genreSuggestions: LibraryCatalog(libraryViewModel.tracks).genres,
+            catalog: LibraryCatalog(libraryViewModel.tracks),
             onRemove: libraryViewModel.removeTracks,
             onEdit: (track, values) =>
                 libraryViewModel.updateTrackMetadata(track, values),
@@ -537,7 +539,7 @@ class _EmptyLibrary extends StatelessWidget {
 class _TrackTable extends StatefulWidget {
   const _TrackTable({
     required this.tracks,
-    required this.genreSuggestions,
+    required this.catalog,
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
@@ -547,8 +549,8 @@ class _TrackTable extends StatefulWidget {
 
   final List<Track> tracks;
 
-  /// 曲編集ダイアログのジャンル候補（ライブラリ全体の既存ジャンル）。
-  final List<String> genreSuggestions;
+  /// ライブラリ全体。編集ダイアログのジャンル候補やアルバム収録曲の参照に使う。
+  final LibraryCatalog catalog;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
@@ -586,7 +588,7 @@ class _TrackTableState extends State<_TrackTable> {
       context: context,
       builder: (context) => MetadataEditDialog(
         track: track,
-        genreSuggestions: widget.genreSuggestions,
+        genreSuggestions: widget.catalog.genres,
       ),
     );
     if (values != null) await widget.onEdit(track, values);
@@ -594,44 +596,34 @@ class _TrackTableState extends State<_TrackTable> {
 
   Future<void> _bulkEdit() async {
     final selected = _selectedTracks;
-    final values = await showDialog<MetadataValues>(
-      context: context,
-      builder: (context) => BulkMetadataEditDialog(tracks: selected),
-    );
-    if (values == null || !mounted) return;
-    // REQ-004: 件数だけでなく、実際に書き込む項目と値を確認できるようにする。
-    final changes = bulkEditableFields
-        .where(values.changes)
-        .map(
-          (field) =>
-              '・${bulkFieldLabel(field)}: ${values.valueOf(field) ?? '（空欄にする）'}',
-        )
-        .join('\n');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('次の変更を適用します'),
-        content: Text(
-          '${selected.length}曲に以下を適用します。\n\n'
-          '$changes\n\n'
-          '変更しない項目と元の音楽ファイルには書き込みません。',
+    BulkEditRequest? request;
+    while (mounted) {
+      final plan = await showDialog<BulkEditPlan>(
+        context: context,
+        builder: (context) => BulkMetadataEditDialog(
+          tracks: selected,
+          catalog: widget.catalog,
+          initialRequest: request,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('戻る'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('適用'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true &&
-        await widget.onBulkEdit(selected, values) &&
-        mounted) {
-      setState(_selectedPaths.clear);
+      );
+      if (plan == null || !mounted) return;
+      // REQ-004: 分割/リネームを含む適用内容と対象曲数を確認してから書き込む。
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => BulkEditConfirmDialog(plan: plan),
+      );
+      if (!mounted) return;
+      if (confirmed == false) {
+        // 「戻る」: 入力内容を保ったまま編集ダイアログへ戻る。
+        request = plan.request;
+        continue;
+      }
+      if (confirmed == true &&
+          await widget.onBulkEdit(plan.targets, plan.values) &&
+          mounted) {
+        setState(_selectedPaths.clear);
+      }
+      return;
     }
   }
 

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,7 @@ import 'package:muzia/features/library/domain/bulk_edit_plan.dart';
 import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/library_search.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
+import 'package:muzia/features/library/domain/track_sort.dart';
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
@@ -162,6 +165,7 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
                     searchQuery: _searchQuery,
                     onPlay: playerViewModel.play,
                     playingPath: playerViewModel.track?.filePath,
+                    playbackActive: playerViewModel.isPlaying,
                     onPickFolder: libraryViewModel.chooseAndScanFolder,
                   ),
                 ),
@@ -319,6 +323,7 @@ class _MainContent extends StatelessWidget {
     required this.searchQuery,
     required this.onPlay,
     required this.playingPath,
+    required this.playbackActive,
     required this.onPickFolder,
   });
 
@@ -328,6 +333,9 @@ class _MainContent extends StatelessWidget {
   final String searchQuery;
   final ValueChanged<Track> onPlay;
   final String? playingPath;
+
+  /// 再生中（一時停止ではない）か。再生中行のイコライザを動かす判定に使う。
+  final bool playbackActive;
   final Future<void> Function() onPickFolder;
 
   @override
@@ -395,6 +403,7 @@ class _MainContent extends StatelessWidget {
             onBulkEdit: libraryViewModel.updateTracksMetadata,
             onPlay: onPlay,
             playingPath: playingPath,
+            playbackActive: playbackActive,
           );
 
     // 警告は一覧の外に出す。検索0件の空状態でも通知が消えないようにする。
@@ -545,6 +554,7 @@ class _TrackTable extends StatefulWidget {
     required this.onBulkEdit,
     required this.onPlay,
     required this.playingPath,
+    required this.playbackActive,
   });
 
   final List<Track> tracks;
@@ -557,6 +567,7 @@ class _TrackTable extends StatefulWidget {
   onBulkEdit;
   final ValueChanged<Track> onPlay;
   final String? playingPath;
+  final bool playbackActive;
 
   @override
   State<_TrackTable> createState() => _TrackTableState();
@@ -564,13 +575,45 @@ class _TrackTable extends StatefulWidget {
 
 class _TrackTableState extends State<_TrackTable> {
   final Set<String> _selectedPaths = {};
+  final _focusNode = FocusNode(debugLabel: 'track-table');
   int? _anchorIndex;
   int? _lastTapIndex;
   DateTime? _lastTapTime;
 
-  List<Track> get _selectedTracks => widget.tracks
+  /// ヘッダクリックのソート状態。永続化しない（起動時は登録順）。
+  TrackSort? _sort;
+
+  /// 表示順（ソート適用後）。build で更新し、クリック位置の解決に使う。
+  List<Track> _visible = const [];
+
+  static bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
+
+  /// コンテキストメニューに表記する「曲を編集…」のショートカット。
+  static String get editShortcutLabel => _isMac ? '⌘I' : 'Ctrl+I';
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  List<Track> get _selectedTracks => _visible
       .where((track) => _selectedPaths.contains(track.filePath))
       .toList(growable: false);
+
+  /// ⌘I（Windows は Ctrl+I）: 1曲選択なら曲編集、2曲以上なら一括編集を開く。
+  void _editSelected() {
+    final selected = _selectedTracks;
+    if (selected.length == 1) {
+      unawaited(_editTrack(selected.single));
+    } else if (selected.length >= 2) {
+      unawaited(_bulkEdit());
+    }
+  }
+
+  void _toggleSort(TrackSortField field) {
+    setState(() => _sort = _sort?.toggled(field) ?? TrackSort(field));
+  }
 
   Future<void> _confirmRemove(List<Track> targets) async {
     final confirmed = await showDialog<bool>(
@@ -628,7 +671,8 @@ class _TrackTableState extends State<_TrackTable> {
   }
 
   void _handlePrimaryDown(int index) {
-    final track = widget.tracks[index];
+    _focusNode.requestFocus();
+    final track = _visible[index];
     final now = DateTime.now();
     final isDoubleClick =
         _lastTapIndex == index &&
@@ -655,9 +699,7 @@ class _TrackTableState extends State<_TrackTable> {
         _selectedPaths
           ..clear()
           ..addAll(
-            widget.tracks
-                .sublist(start, end + 1)
-                .map((track) => track.filePath),
+            _visible.sublist(start, end + 1).map((track) => track.filePath),
           );
       } else {
         _selectedPaths
@@ -670,7 +712,7 @@ class _TrackTableState extends State<_TrackTable> {
 
   Future<void> _showContextMenu(int index, Offset globalPosition) async {
     final colors = Theme.of(context).extension<MuziaColors>()!;
-    final track = widget.tracks[index];
+    final track = _visible[index];
     if (!_selectedPaths.contains(track.filePath)) {
       setState(() {
         _selectedPaths
@@ -699,7 +741,19 @@ class _TrackTableState extends State<_TrackTable> {
         PopupMenuItem(
           value: 'edit',
           height: 32,
-          child: Text('曲を編集…', style: MuziaTextStyles.body),
+          child: Row(
+            children: [
+              const Expanded(child: Text('曲を編集…', style: MuziaTextStyles.body)),
+              const SizedBox(width: MuziaSpacing.s4),
+              Text(
+                editShortcutLabel,
+                style: MuziaTextStyles.caption.copyWith(
+                  color: colors.fgTertiary,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'remove',
@@ -728,83 +782,237 @@ class _TrackTableState extends State<_TrackTable> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<MuziaColors>()!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_selectedPaths.length >= 2)
-          Container(
-            color: colors.accentSoft,
-            padding: const EdgeInsets.symmetric(
-              horizontal: MuziaSpacing.s4,
-              vertical: MuziaSpacing.s1,
+    _visible = sortTracks(widget.tracks, _sort);
+    final headerStyle = MuziaTextStyles.caption.copyWith(
+      color: colors.fgTertiary,
+    );
+    return CallbackShortcuts(
+      bindings: {
+        SingleActivator(
+          LogicalKeyboardKey.keyI,
+          meta: _isMac,
+          control: !_isMac,
+        ): _editSelected,
+      },
+      child: Focus(
+        focusNode: _focusNode,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_selectedPaths.length >= 2)
+              Container(
+                color: colors.accentSoft,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: MuziaSpacing.s4,
+                  vertical: MuziaSpacing.s1,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '${_selectedPaths.length}曲を選択中',
+                      style: MuziaTextStyles.rowTitle.copyWith(
+                        color: colors.accentText,
+                      ),
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      onPressed: _bulkEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 14),
+                      label: const Text('一括編集'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: MuziaTextStyles.rowTitle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colors.borderSubtle)),
+              ),
+              child: _TrackCells(
+                number: Text(
+                  '#',
+                  textAlign: TextAlign.right,
+                  style: headerStyle,
+                ),
+                title: _SortableHeader(
+                  label: 'タイトル',
+                  field: TrackSortField.title,
+                  sort: _sort,
+                  onTap: _toggleSort,
+                ),
+                artist: _SortableHeader(
+                  label: 'アーティスト',
+                  field: TrackSortField.artist,
+                  sort: _sort,
+                  onTap: _toggleSort,
+                ),
+                album: _SortableHeader(
+                  label: 'アルバム',
+                  field: TrackSortField.album,
+                  sort: _sort,
+                  onTap: _toggleSort,
+                ),
+                time: _SortableHeader(
+                  label: '時間',
+                  field: TrackSortField.duration,
+                  sort: _sort,
+                  onTap: _toggleSort,
+                  alignEnd: true,
+                ),
+              ),
             ),
-            child: Row(
-              children: [
-                Text(
-                  '${_selectedPaths.length}曲を選択中',
-                  style: MuziaTextStyles.rowTitle.copyWith(
-                    color: colors.accentText,
-                  ),
-                ),
-                const Spacer(),
-                FilledButton.icon(
-                  onPressed: _bulkEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 14),
-                  label: const Text('一括編集'),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    textStyle: MuziaTextStyles.rowTitle,
-                  ),
-                ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _visible.length,
+                itemExtent: 30,
+                itemBuilder: (context, index) {
+                  final track = _visible[index];
+                  return _TrackRow(
+                    key: ValueKey('track-row-$index'),
+                    index: index,
+                    track: track,
+                    selected: _selectedPaths.contains(track.filePath),
+                    playing: widget.playingPath == track.filePath,
+                    playbackActive: widget.playbackActive,
+                    onPrimaryDown: () => _handlePrimaryDown(index),
+                    onSecondaryDown: (position) =>
+                        unawaited(_showContextMenu(index, position)),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// クリックでソートを切り替えるヘッダセル。ソート中の列は色を上げて方向を示す。
+class _SortableHeader extends StatelessWidget {
+  const _SortableHeader({
+    required this.label,
+    required this.field,
+    required this.sort,
+    required this.onTap,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final TrackSortField field;
+  final TrackSort? sort;
+  final ValueChanged<TrackSortField> onTap;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final active = sort?.field == field;
+    final color = active ? colors.fgSecondary : colors.fgTertiary;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        key: ValueKey('sort-${field.name}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap(field),
+        child: Row(
+          mainAxisAlignment: alignEnd
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            Text(label, style: MuziaTextStyles.caption.copyWith(color: color)),
+            if (active) ...[
+              const SizedBox(width: 3),
+              Icon(
+                sort!.ascending ? Icons.arrow_downward : Icons.arrow_upward,
+                size: 11,
+                color: color,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 再生中行の #セルに出す3本バーのイコライザ（`.eq`）。
+///
+/// 再生中だけ 0.9 秒周期で動き、一時停止中と Reduce Motion 時は静止する。
+class _Equalizer extends StatefulWidget {
+  const _Equalizer({required this.color, required this.animating});
+
+  final Color color;
+  final bool animating;
+
+  @override
+  State<_Equalizer> createState() => _EqualizerState();
+}
+
+class _EqualizerState extends State<_Equalizer>
+    with SingleTickerProviderStateMixin {
+  static const _heights = [0.6, 1.0, 0.4];
+  static const _phases = [-0.2 / 0.9, -0.5 / 0.9, 0.0];
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: MuziaMotion.equalizerLoop,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final animate =
+        widget.animating && !MediaQuery.disableAnimationsOf(context);
+    if (animate && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!animate && _controller.isAnimating) {
+      _controller.stop();
+    }
+    return Align(
+      alignment: Alignment.centerRight,
+      child: SizedBox(
+        key: const ValueKey('now-playing-equalizer'),
+        height: 11,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 1.5),
+                _bar(i, animate),
               ],
-            ),
-          ),
-        Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: colors.borderSubtle)),
-          ),
-          child: _TrackCells(
-            number: Text(
-              '#',
-              textAlign: TextAlign.right,
-              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
-            ),
-            title: Text(
-              'タイトル',
-              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
-            ),
-            artist: Text(
-              'アーティスト',
-              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
-            ),
-            album: Text(
-              'アルバム',
-              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
-            ),
+            ],
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: widget.tracks.length,
-            itemExtent: 30,
-            itemBuilder: (context, index) {
-              final track = widget.tracks[index];
-              return _TrackRow(
-                key: ValueKey('track-row-$index'),
-                index: index,
-                track: track,
-                selected: _selectedPaths.contains(track.filePath),
-                playing: widget.playingPath == track.filePath,
-                onPrimaryDown: () => _handlePrimaryDown(index),
-                onSecondaryDown: (position) =>
-                    unawaited(_showContextMenu(index, position)),
-              );
-            },
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+
+  Widget _bar(int index, bool animate) {
+    // 0% と 100% で scaleY(0.35)、50% で scaleY(1) の ease-in-out。静止時は 0.7。
+    final t = (_controller.value + _phases[index]) % 1;
+    final scale = animate
+        ? 0.35 + 0.65 * (0.5 - 0.5 * math.cos(2 * math.pi * t))
+        : 0.7;
+    return Container(
+      width: 2,
+      height: 11 * _heights[index] * scale,
+      decoration: BoxDecoration(
+        color: widget.color,
+        borderRadius: BorderRadius.circular(1),
+      ),
     );
   }
 }
@@ -816,12 +1024,14 @@ class _TrackCells extends StatelessWidget {
     required this.title,
     required this.artist,
     required this.album,
+    required this.time,
   });
 
   final Widget number;
   final Widget title;
   final Widget artist;
   final Widget album;
+  final Widget time;
 
   @override
   Widget build(BuildContext context) {
@@ -834,6 +1044,8 @@ class _TrackCells extends StatelessWidget {
         Expanded(flex: 2, child: artist),
         const SizedBox(width: MuziaSpacing.s4),
         Expanded(flex: 2, child: album),
+        const SizedBox(width: MuziaSpacing.s4),
+        SizedBox(width: 56, child: time),
       ],
     );
   }
@@ -846,6 +1058,7 @@ class _TrackRow extends StatefulWidget {
     required this.track,
     required this.selected,
     required this.playing,
+    required this.playbackActive,
     required this.onPrimaryDown,
     required this.onSecondaryDown,
   });
@@ -854,6 +1067,7 @@ class _TrackRow extends StatefulWidget {
   final Track track;
   final bool selected;
   final bool playing;
+  final bool playbackActive;
   final VoidCallback onPrimaryDown;
   final ValueChanged<Offset> onSecondaryDown;
 
@@ -896,14 +1110,19 @@ class _TrackRowState extends State<_TrackRow> {
           color: background,
           padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
           child: _TrackCells(
-            number: Text(
-              '${widget.index + 1}',
-              textAlign: TextAlign.right,
-              style: MuziaTextStyles.body.copyWith(
-                color: selected ? colors.onAccent : colors.fgTertiary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
+            number: widget.playing
+                ? _Equalizer(
+                    color: selected ? colors.onAccent : colors.accent,
+                    animating: widget.playbackActive,
+                  )
+                : Text(
+                    '${widget.index + 1}',
+                    textAlign: TextAlign.right,
+                    style: MuziaTextStyles.body.copyWith(
+                      color: selected ? colors.onAccent : colors.fgTertiary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
             title: Text(
               widget.track.title?.isNotEmpty == true
                   ? widget.track.title!
@@ -920,6 +1139,14 @@ class _TrackRowState extends State<_TrackRow> {
               widget.track.album ?? 'アルバム不明',
               overflow: TextOverflow.ellipsis,
               style: MuziaTextStyles.body.copyWith(color: secondaryColor),
+            ),
+            time: Text(
+              formatTrackDuration(widget.track.durationMs),
+              textAlign: TextAlign.right,
+              style: MuziaTextStyles.body.copyWith(
+                color: secondaryColor,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ),

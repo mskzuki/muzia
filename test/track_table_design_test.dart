@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ const _tracks = [
     title: 'Neon Hours',
     artist: 'Midnight Arcade',
     album: 'Parallel Lines',
+    durationMs: 238000,
   ),
   Track(
     filePath: '/tmp/b.mp3',
@@ -24,6 +26,7 @@ const _tracks = [
     title: 'Coastlines',
     artist: 'Hollow Coast',
     album: 'Tidewater',
+    durationMs: 261000,
   ),
   Track(
     filePath: '/tmp/c.mp3',
@@ -45,12 +48,24 @@ Future<LibraryViewModel> _libraryWithTracks() async {
 Future<void> _pumpApp(
   WidgetTester tester, {
   PlayerViewModel? player,
+  bool reduceMotion = true,
 }) async {
+  // 再生中行のイコライザは無限ループのため、既定では Reduce Motion で静止させて
+  // pumpAndSettle が完了するようにする。
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      FakeAccessibilityFeatures(disableAnimations: reduceMotion);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   final library = await _libraryWithTracks();
   await tester.pumpWidget(
     MuziaApp(libraryViewModel: library, playerViewModel: player),
   );
-  await tester.pumpAndSettle();
+  if (reduceMotion) {
+    await tester.pumpAndSettle();
+  } else {
+    // イコライザが動いている間は settle しないため、数フレームだけ進める。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 Future<void> _metaTap(WidgetTester tester, Finder finder) async {
@@ -68,6 +83,11 @@ void main() {
     expect(find.text('タイトル'), findsOneWidget);
     expect(find.text('アーティスト'), findsOneWidget);
     expect(find.text('アルバム'), findsOneWidget);
+    expect(find.text('時間'), findsOneWidget);
+    // 時間列は m:ss、未取得は「—」
+    expect(find.text('3:58'), findsOneWidget);
+    expect(find.text('4:21'), findsOneWidget);
+    expect(find.text('—'), findsOneWidget);
 
     final row = find.byKey(const ValueKey('track-row-0'));
     expect(row, findsOneWidget);
@@ -117,6 +137,7 @@ void main() {
 
     expect(find.text('曲を再生'), findsOneWidget);
     expect(find.text('曲を編集…'), findsOneWidget);
+    expect(find.text(_editShortcut), findsOneWidget);
     expect(find.text('ライブラリから削除…'), findsOneWidget);
 
     await tester.tap(find.text('曲を編集…'));
@@ -132,13 +153,10 @@ void main() {
     await tester.tap(find.text('ライブラリから削除…'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('1曲をライブラリから削除しますか？'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('1曲をライブラリから削除しますか？'), findsOneWidget);
   });
 
-  testWidgets('再生中の行タイトルをアクセント色で表示する', (tester) async {
+  testWidgets('再生中の行タイトルをアクセント色で表示し、#セルをイコライザにする', (tester) async {
     final player = PlayerViewModel(service: FakeAudioPlayerService());
     await player.play(_tracks[1]);
     await _pumpApp(tester, player: player);
@@ -146,5 +164,81 @@ void main() {
     final colors = MuziaColors.light;
     final title = tester.widgetList<Text>(find.text('Coastlines')).first;
     expect(title.style?.color, colors.accentText);
+    expect(find.byKey(const ValueKey('now-playing-equalizer')), findsOneWidget);
+    // 再生中の2行目は番号を出さない
+    Finder numberIn(int row, String text) => find.descendant(
+      of: find.byKey(ValueKey('track-row-$row')),
+      matching: find.text(text),
+    );
+    expect(numberIn(0, '1'), findsOneWidget);
+    expect(numberIn(1, '2'), findsNothing);
+    expect(numberIn(2, '3'), findsOneWidget);
+  });
+
+  testWidgets('イコライザは再生中だけ動き、一時停止で止まる', (tester) async {
+    final player = PlayerViewModel(service: FakeAudioPlayerService());
+    await player.play(_tracks[1]);
+    await _pumpApp(tester, player: player, reduceMotion: false);
+
+    final bars = find.descendant(
+      of: find.byKey(const ValueKey('now-playing-equalizer')),
+      matching: find.byType(Container),
+    );
+    double firstBarHeight() => tester.getSize(bars.first).height;
+    final before = firstBarHeight();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(firstBarHeight(), isNot(before));
+
+    await player.togglePause();
+    await tester.pump();
+    final paused = firstBarHeight();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(firstBarHeight(), paused);
+  });
+
+  testWidgets('ヘッダクリックで列ソートし、再クリックで降順になる', (tester) async {
+    await _pumpApp(tester);
+
+    double rowY(String title) => tester.getTopLeft(find.text(title)).dy;
+    // 登録順: Neon Hours, Coastlines, Paper Crowns
+    expect(rowY('Neon Hours'), lessThan(rowY('Coastlines')));
+
+    await tester.tap(find.byKey(const ValueKey('sort-title')));
+    await tester.pump();
+    expect(rowY('Coastlines'), lessThan(rowY('Neon Hours')));
+    expect(rowY('Neon Hours'), lessThan(rowY('Paper Crowns')));
+    expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('sort-title')));
+    await tester.pump();
+    expect(rowY('Paper Crowns'), lessThan(rowY('Neon Hours')));
+    expect(rowY('Neon Hours'), lessThan(rowY('Coastlines')));
+    expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+
+    // 時間列: 未取得（—）は末尾
+    await tester.tap(find.byKey(const ValueKey('sort-duration')));
+    await tester.pump();
+    expect(rowY('Neon Hours'), lessThan(rowY('Coastlines')));
+    expect(rowY('Coastlines'), lessThan(rowY('Paper Crowns')));
+  });
+
+  testWidgets('行を選択して⌘I（Ctrl+I）で曲編集ダイアログを開く', (tester) async {
+    await _pumpApp(tester);
+
+    await tester.tap(find.text('Neon Hours'));
+    await tester.pump();
+    await tester.sendKeyDownEvent(_editModifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.sendKeyUpEvent(_editModifier);
+    await tester.pumpAndSettle();
+
+    expect(find.text('曲を編集'), findsOneWidget);
+    expect(find.text('Black or White — Dangerous'), findsNothing);
   });
 }
+
+final bool _isMac = defaultTargetPlatform == TargetPlatform.macOS;
+final String _editShortcut = _isMac ? '⌘I' : 'Ctrl+I';
+final LogicalKeyboardKey _editModifier = _isMac
+    ? LogicalKeyboardKey.metaLeft
+    : LogicalKeyboardKey.controlLeft;

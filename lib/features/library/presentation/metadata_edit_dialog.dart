@@ -50,8 +50,17 @@ class _MetadataEditDialogState extends State<MetadataEditDialog> {
       setState(() => _titleError = '曲名を入力してください。');
       return;
     }
+    // このフォームが扱う4項目だけを更新対象にする。全項目を対象にすると、
+    // フォーム未対応のトラック番号・リリース年・ジャンルがnullで上書きされる。
+    // 新項目のUI対応は課題 2609021645 / 2609021646 で行う。
     Navigator.of(context).pop(
-      MetadataValues(
+      MetadataValues.partial(
+        fields: const {
+          MetadataField.title,
+          MetadataField.artist,
+          MetadataField.album,
+          MetadataField.releaseInfo,
+        },
         title: title,
         artist: _normalize(_artist),
         album: _normalize(_album),

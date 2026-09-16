@@ -8,6 +8,10 @@ class Track {
     this.artist,
     this.album,
     this.releaseInfo,
+    this.durationMs,
+    this.trackNumber,
+    this.releaseYear,
+    this.genre,
     this.isRemoved = false,
   });
 
@@ -17,6 +21,14 @@ class Track {
   final String? artist;
   final String? album;
   final String? releaseInfo;
+
+  /// 再生時間（ミリ秒）。タグから取得できない場合はnull。
+  final int? durationMs;
+  final int? trackNumber;
+
+  /// リリース年（4桁）。自由記述の [releaseInfo] とは別に構造化して保持する。
+  final int? releaseYear;
+  final String? genre;
   final bool isRemoved;
 
   Track copyWith({
@@ -24,6 +36,10 @@ class Track {
     String? artist,
     String? album,
     String? releaseInfo,
+    int? durationMs,
+    int? trackNumber,
+    int? releaseYear,
+    String? genre,
     bool? isRemoved,
   }) {
     return Track(
@@ -33,15 +49,23 @@ class Track {
       artist: artist ?? this.artist,
       album: album ?? this.album,
       releaseInfo: releaseInfo ?? this.releaseInfo,
+      durationMs: durationMs ?? this.durationMs,
+      trackNumber: trackNumber ?? this.trackNumber,
+      releaseYear: releaseYear ?? this.releaseYear,
+      genre: genre ?? this.genre,
       isRemoved: isRemoved ?? this.isRemoved,
     );
   }
 
+  /// 数値項目は編集フォームで扱う文字列表現を返す。
   String? valueOf(MetadataField field) => switch (field) {
     MetadataField.title => title,
     MetadataField.artist => artist,
     MetadataField.album => album,
     MetadataField.releaseInfo => releaseInfo,
+    MetadataField.trackNumber => trackNumber?.toString(),
+    MetadataField.releaseYear => releaseYear?.toString(),
+    MetadataField.genre => genre,
   };
 
   /// [values] が更新対象とした項目だけを差し替える。
@@ -56,6 +80,14 @@ class Track {
       releaseInfo: values.changes(MetadataField.releaseInfo)
           ? values.releaseInfo
           : releaseInfo,
+      durationMs: durationMs,
+      trackNumber: values.changes(MetadataField.trackNumber)
+          ? values.trackNumber
+          : trackNumber,
+      releaseYear: values.changes(MetadataField.releaseYear)
+          ? values.releaseYear
+          : releaseYear,
+      genre: values.changes(MetadataField.genre) ? values.genre : genre,
       isRemoved: isRemoved,
     );
   }
@@ -69,6 +101,10 @@ class Track {
         other.artist == artist &&
         other.album == album &&
         other.releaseInfo == releaseInfo &&
+        other.durationMs == durationMs &&
+        other.trackNumber == trackNumber &&
+        other.releaseYear == releaseYear &&
+        other.genre == genre &&
         other.isRemoved == isRemoved;
   }
 
@@ -80,6 +116,10 @@ class Track {
     artist,
     album,
     releaseInfo,
+    durationMs,
+    trackNumber,
+    releaseYear,
+    genre,
     isRemoved,
   );
 }

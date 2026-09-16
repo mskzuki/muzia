@@ -50,6 +50,9 @@ dev_dependencies:
     sdk: flutter
   build_runner: ^2.15.1
   drift_dev: ^2.34.2
+  # 旧スキーマのDBファイルを組み立ててマイグレーションを検証するために使う。
+  # driftの推移的依存で、既にアプリへ同梱されているパッケージ。
+  sqlite3: ^3.5.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

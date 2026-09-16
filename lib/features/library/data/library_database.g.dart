@@ -539,6 +539,17 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _removedAtMeta = const VerificationMeta(
     'removedAt',
   );
@@ -578,6 +589,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     libraryFolderId,
     filePath,
     fileExtension,
+    durationMs,
     removedAt,
     createdAt,
     updatedAt,
@@ -627,6 +639,12 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     } else if (isInserting) {
       context.missing(_fileExtensionMeta);
     }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
     if (data.containsKey('removed_at')) {
       context.handle(
         _removedAtMeta,
@@ -674,6 +692,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.string,
         data['${effectivePrefix}file_extension'],
       )!,
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      ),
       removedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}removed_at'],
@@ -700,6 +722,9 @@ class Track extends DataClass implements Insertable<Track> {
   final int libraryFolderId;
   final String filePath;
   final String fileExtension;
+
+  /// 再生時間（ミリ秒）。ファイル由来の値で、ユーザーは編集できない。
+  final int? durationMs;
   final DateTime? removedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -708,6 +733,7 @@ class Track extends DataClass implements Insertable<Track> {
     required this.libraryFolderId,
     required this.filePath,
     required this.fileExtension,
+    this.durationMs,
     this.removedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -719,6 +745,9 @@ class Track extends DataClass implements Insertable<Track> {
     map['library_folder_id'] = Variable<int>(libraryFolderId);
     map['file_path'] = Variable<String>(filePath);
     map['file_extension'] = Variable<String>(fileExtension);
+    if (!nullToAbsent || durationMs != null) {
+      map['duration_ms'] = Variable<int>(durationMs);
+    }
     if (!nullToAbsent || removedAt != null) {
       map['removed_at'] = Variable<DateTime>(removedAt);
     }
@@ -733,6 +762,9 @@ class Track extends DataClass implements Insertable<Track> {
       libraryFolderId: Value(libraryFolderId),
       filePath: Value(filePath),
       fileExtension: Value(fileExtension),
+      durationMs: durationMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMs),
       removedAt: removedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(removedAt),
@@ -751,6 +783,7 @@ class Track extends DataClass implements Insertable<Track> {
       libraryFolderId: serializer.fromJson<int>(json['libraryFolderId']),
       filePath: serializer.fromJson<String>(json['filePath']),
       fileExtension: serializer.fromJson<String>(json['fileExtension']),
+      durationMs: serializer.fromJson<int?>(json['durationMs']),
       removedAt: serializer.fromJson<DateTime?>(json['removedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -764,6 +797,7 @@ class Track extends DataClass implements Insertable<Track> {
       'libraryFolderId': serializer.toJson<int>(libraryFolderId),
       'filePath': serializer.toJson<String>(filePath),
       'fileExtension': serializer.toJson<String>(fileExtension),
+      'durationMs': serializer.toJson<int?>(durationMs),
       'removedAt': serializer.toJson<DateTime?>(removedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -775,6 +809,7 @@ class Track extends DataClass implements Insertable<Track> {
     int? libraryFolderId,
     String? filePath,
     String? fileExtension,
+    Value<int?> durationMs = const Value.absent(),
     Value<DateTime?> removedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -783,6 +818,7 @@ class Track extends DataClass implements Insertable<Track> {
     libraryFolderId: libraryFolderId ?? this.libraryFolderId,
     filePath: filePath ?? this.filePath,
     fileExtension: fileExtension ?? this.fileExtension,
+    durationMs: durationMs.present ? durationMs.value : this.durationMs,
     removedAt: removedAt.present ? removedAt.value : this.removedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -797,6 +833,9 @@ class Track extends DataClass implements Insertable<Track> {
       fileExtension: data.fileExtension.present
           ? data.fileExtension.value
           : this.fileExtension,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
       removedAt: data.removedAt.present ? data.removedAt.value : this.removedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -810,6 +849,7 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('libraryFolderId: $libraryFolderId, ')
           ..write('filePath: $filePath, ')
           ..write('fileExtension: $fileExtension, ')
+          ..write('durationMs: $durationMs, ')
           ..write('removedAt: $removedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -823,6 +863,7 @@ class Track extends DataClass implements Insertable<Track> {
     libraryFolderId,
     filePath,
     fileExtension,
+    durationMs,
     removedAt,
     createdAt,
     updatedAt,
@@ -835,6 +876,7 @@ class Track extends DataClass implements Insertable<Track> {
           other.libraryFolderId == this.libraryFolderId &&
           other.filePath == this.filePath &&
           other.fileExtension == this.fileExtension &&
+          other.durationMs == this.durationMs &&
           other.removedAt == this.removedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -845,6 +887,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<int> libraryFolderId;
   final Value<String> filePath;
   final Value<String> fileExtension;
+  final Value<int?> durationMs;
   final Value<DateTime?> removedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -853,6 +896,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.libraryFolderId = const Value.absent(),
     this.filePath = const Value.absent(),
     this.fileExtension = const Value.absent(),
+    this.durationMs = const Value.absent(),
     this.removedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -862,6 +906,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     required int libraryFolderId,
     required String filePath,
     required String fileExtension,
+    this.durationMs = const Value.absent(),
     this.removedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -875,6 +920,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<int>? libraryFolderId,
     Expression<String>? filePath,
     Expression<String>? fileExtension,
+    Expression<int>? durationMs,
     Expression<DateTime>? removedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -884,6 +930,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (libraryFolderId != null) 'library_folder_id': libraryFolderId,
       if (filePath != null) 'file_path': filePath,
       if (fileExtension != null) 'file_extension': fileExtension,
+      if (durationMs != null) 'duration_ms': durationMs,
       if (removedAt != null) 'removed_at': removedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -895,6 +942,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<int>? libraryFolderId,
     Value<String>? filePath,
     Value<String>? fileExtension,
+    Value<int?>? durationMs,
     Value<DateTime?>? removedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -904,6 +952,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       libraryFolderId: libraryFolderId ?? this.libraryFolderId,
       filePath: filePath ?? this.filePath,
       fileExtension: fileExtension ?? this.fileExtension,
+      durationMs: durationMs ?? this.durationMs,
       removedAt: removedAt ?? this.removedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -925,6 +974,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (fileExtension.present) {
       map['file_extension'] = Variable<String>(fileExtension.value);
     }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
     if (removedAt.present) {
       map['removed_at'] = Variable<DateTime>(removedAt.value);
     }
@@ -944,6 +996,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('libraryFolderId: $libraryFolderId, ')
           ..write('filePath: $filePath, ')
           ..write('fileExtension: $fileExtension, ')
+          ..write('durationMs: $durationMs, ')
           ..write('removedAt: $removedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1007,6 +1060,37 @@ class $TrackMetadataTable extends TrackMetadata
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _trackNumberMeta = const VerificationMeta(
+    'trackNumber',
+  );
+  @override
+  late final GeneratedColumn<int> trackNumber = GeneratedColumn<int>(
+    'track_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _releaseYearMeta = const VerificationMeta(
+    'releaseYear',
+  );
+  @override
+  late final GeneratedColumn<int> releaseYear = GeneratedColumn<int>(
+    'release_year',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _genreMeta = const VerificationMeta('genre');
+  @override
+  late final GeneratedColumn<String> genre = GeneratedColumn<String>(
+    'genre',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -1025,6 +1109,9 @@ class $TrackMetadataTable extends TrackMetadata
     artist,
     album,
     releaseInfo,
+    trackNumber,
+    releaseYear,
+    genre,
     updatedAt,
   ];
   @override
@@ -1072,6 +1159,30 @@ class $TrackMetadataTable extends TrackMetadata
         ),
       );
     }
+    if (data.containsKey('track_number')) {
+      context.handle(
+        _trackNumberMeta,
+        trackNumber.isAcceptableOrUnknown(
+          data['track_number']!,
+          _trackNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('release_year')) {
+      context.handle(
+        _releaseYearMeta,
+        releaseYear.isAcceptableOrUnknown(
+          data['release_year']!,
+          _releaseYearMeta,
+        ),
+      );
+    }
+    if (data.containsKey('genre')) {
+      context.handle(
+        _genreMeta,
+        genre.isAcceptableOrUnknown(data['genre']!, _genreMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -1109,6 +1220,18 @@ class $TrackMetadataTable extends TrackMetadata
         DriftSqlType.string,
         data['${effectivePrefix}release_info'],
       ),
+      trackNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track_number'],
+      ),
+      releaseYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}release_year'],
+      ),
+      genre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}genre'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -1129,6 +1252,9 @@ class TrackMetadataData extends DataClass
   final String? artist;
   final String? album;
   final String? releaseInfo;
+  final int? trackNumber;
+  final int? releaseYear;
+  final String? genre;
   final DateTime updatedAt;
   const TrackMetadataData({
     required this.trackId,
@@ -1136,6 +1262,9 @@ class TrackMetadataData extends DataClass
     this.artist,
     this.album,
     this.releaseInfo,
+    this.trackNumber,
+    this.releaseYear,
+    this.genre,
     required this.updatedAt,
   });
   @override
@@ -1153,6 +1282,15 @@ class TrackMetadataData extends DataClass
     }
     if (!nullToAbsent || releaseInfo != null) {
       map['release_info'] = Variable<String>(releaseInfo);
+    }
+    if (!nullToAbsent || trackNumber != null) {
+      map['track_number'] = Variable<int>(trackNumber);
+    }
+    if (!nullToAbsent || releaseYear != null) {
+      map['release_year'] = Variable<int>(releaseYear);
+    }
+    if (!nullToAbsent || genre != null) {
+      map['genre'] = Variable<String>(genre);
     }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1173,6 +1311,15 @@ class TrackMetadataData extends DataClass
       releaseInfo: releaseInfo == null && nullToAbsent
           ? const Value.absent()
           : Value(releaseInfo),
+      trackNumber: trackNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trackNumber),
+      releaseYear: releaseYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releaseYear),
+      genre: genre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(genre),
       updatedAt: Value(updatedAt),
     );
   }
@@ -1188,6 +1335,9 @@ class TrackMetadataData extends DataClass
       artist: serializer.fromJson<String?>(json['artist']),
       album: serializer.fromJson<String?>(json['album']),
       releaseInfo: serializer.fromJson<String?>(json['releaseInfo']),
+      trackNumber: serializer.fromJson<int?>(json['trackNumber']),
+      releaseYear: serializer.fromJson<int?>(json['releaseYear']),
+      genre: serializer.fromJson<String?>(json['genre']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -1200,6 +1350,9 @@ class TrackMetadataData extends DataClass
       'artist': serializer.toJson<String?>(artist),
       'album': serializer.toJson<String?>(album),
       'releaseInfo': serializer.toJson<String?>(releaseInfo),
+      'trackNumber': serializer.toJson<int?>(trackNumber),
+      'releaseYear': serializer.toJson<int?>(releaseYear),
+      'genre': serializer.toJson<String?>(genre),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -1210,6 +1363,9 @@ class TrackMetadataData extends DataClass
     Value<String?> artist = const Value.absent(),
     Value<String?> album = const Value.absent(),
     Value<String?> releaseInfo = const Value.absent(),
+    Value<int?> trackNumber = const Value.absent(),
+    Value<int?> releaseYear = const Value.absent(),
+    Value<String?> genre = const Value.absent(),
     DateTime? updatedAt,
   }) => TrackMetadataData(
     trackId: trackId ?? this.trackId,
@@ -1217,6 +1373,9 @@ class TrackMetadataData extends DataClass
     artist: artist.present ? artist.value : this.artist,
     album: album.present ? album.value : this.album,
     releaseInfo: releaseInfo.present ? releaseInfo.value : this.releaseInfo,
+    trackNumber: trackNumber.present ? trackNumber.value : this.trackNumber,
+    releaseYear: releaseYear.present ? releaseYear.value : this.releaseYear,
+    genre: genre.present ? genre.value : this.genre,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   TrackMetadataData copyWithCompanion(TrackMetadataCompanion data) {
@@ -1228,6 +1387,13 @@ class TrackMetadataData extends DataClass
       releaseInfo: data.releaseInfo.present
           ? data.releaseInfo.value
           : this.releaseInfo,
+      trackNumber: data.trackNumber.present
+          ? data.trackNumber.value
+          : this.trackNumber,
+      releaseYear: data.releaseYear.present
+          ? data.releaseYear.value
+          : this.releaseYear,
+      genre: data.genre.present ? data.genre.value : this.genre,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -1240,14 +1406,26 @@ class TrackMetadataData extends DataClass
           ..write('artist: $artist, ')
           ..write('album: $album, ')
           ..write('releaseInfo: $releaseInfo, ')
+          ..write('trackNumber: $trackNumber, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('genre: $genre, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(trackId, title, artist, album, releaseInfo, updatedAt);
+  int get hashCode => Object.hash(
+    trackId,
+    title,
+    artist,
+    album,
+    releaseInfo,
+    trackNumber,
+    releaseYear,
+    genre,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1257,6 +1435,9 @@ class TrackMetadataData extends DataClass
           other.artist == this.artist &&
           other.album == this.album &&
           other.releaseInfo == this.releaseInfo &&
+          other.trackNumber == this.trackNumber &&
+          other.releaseYear == this.releaseYear &&
+          other.genre == this.genre &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -1266,6 +1447,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
   final Value<String?> artist;
   final Value<String?> album;
   final Value<String?> releaseInfo;
+  final Value<int?> trackNumber;
+  final Value<int?> releaseYear;
+  final Value<String?> genre;
   final Value<DateTime> updatedAt;
   const TrackMetadataCompanion({
     this.trackId = const Value.absent(),
@@ -1273,6 +1457,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
     this.artist = const Value.absent(),
     this.album = const Value.absent(),
     this.releaseInfo = const Value.absent(),
+    this.trackNumber = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.genre = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
   TrackMetadataCompanion.insert({
@@ -1281,6 +1468,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
     this.artist = const Value.absent(),
     this.album = const Value.absent(),
     this.releaseInfo = const Value.absent(),
+    this.trackNumber = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.genre = const Value.absent(),
     required DateTime updatedAt,
   }) : updatedAt = Value(updatedAt);
   static Insertable<TrackMetadataData> custom({
@@ -1289,6 +1479,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
     Expression<String>? artist,
     Expression<String>? album,
     Expression<String>? releaseInfo,
+    Expression<int>? trackNumber,
+    Expression<int>? releaseYear,
+    Expression<String>? genre,
     Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
@@ -1297,6 +1490,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
       if (artist != null) 'artist': artist,
       if (album != null) 'album': album,
       if (releaseInfo != null) 'release_info': releaseInfo,
+      if (trackNumber != null) 'track_number': trackNumber,
+      if (releaseYear != null) 'release_year': releaseYear,
+      if (genre != null) 'genre': genre,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
@@ -1307,6 +1503,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
     Value<String?>? artist,
     Value<String?>? album,
     Value<String?>? releaseInfo,
+    Value<int?>? trackNumber,
+    Value<int?>? releaseYear,
+    Value<String?>? genre,
     Value<DateTime>? updatedAt,
   }) {
     return TrackMetadataCompanion(
@@ -1315,6 +1514,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
       artist: artist ?? this.artist,
       album: album ?? this.album,
       releaseInfo: releaseInfo ?? this.releaseInfo,
+      trackNumber: trackNumber ?? this.trackNumber,
+      releaseYear: releaseYear ?? this.releaseYear,
+      genre: genre ?? this.genre,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -1337,6 +1539,15 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
     if (releaseInfo.present) {
       map['release_info'] = Variable<String>(releaseInfo.value);
     }
+    if (trackNumber.present) {
+      map['track_number'] = Variable<int>(trackNumber.value);
+    }
+    if (releaseYear.present) {
+      map['release_year'] = Variable<int>(releaseYear.value);
+    }
+    if (genre.present) {
+      map['genre'] = Variable<String>(genre.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1351,6 +1562,9 @@ class TrackMetadataCompanion extends UpdateCompanion<TrackMetadataData> {
           ..write('artist: $artist, ')
           ..write('album: $album, ')
           ..write('releaseInfo: $releaseInfo, ')
+          ..write('trackNumber: $trackNumber, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('genre: $genre, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -1412,6 +1626,37 @@ class $TrackSourceMetadataTable extends TrackSourceMetadata
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _trackNumberMeta = const VerificationMeta(
+    'trackNumber',
+  );
+  @override
+  late final GeneratedColumn<int> trackNumber = GeneratedColumn<int>(
+    'track_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _releaseYearMeta = const VerificationMeta(
+    'releaseYear',
+  );
+  @override
+  late final GeneratedColumn<int> releaseYear = GeneratedColumn<int>(
+    'release_year',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _genreMeta = const VerificationMeta('genre');
+  @override
+  late final GeneratedColumn<String> genre = GeneratedColumn<String>(
+    'genre',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _readAtMeta = const VerificationMeta('readAt');
   @override
   late final GeneratedColumn<DateTime> readAt = GeneratedColumn<DateTime>(
@@ -1428,6 +1673,9 @@ class $TrackSourceMetadataTable extends TrackSourceMetadata
     artist,
     album,
     releaseInfo,
+    trackNumber,
+    releaseYear,
+    genre,
     readAt,
   ];
   @override
@@ -1475,6 +1723,30 @@ class $TrackSourceMetadataTable extends TrackSourceMetadata
         ),
       );
     }
+    if (data.containsKey('track_number')) {
+      context.handle(
+        _trackNumberMeta,
+        trackNumber.isAcceptableOrUnknown(
+          data['track_number']!,
+          _trackNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('release_year')) {
+      context.handle(
+        _releaseYearMeta,
+        releaseYear.isAcceptableOrUnknown(
+          data['release_year']!,
+          _releaseYearMeta,
+        ),
+      );
+    }
+    if (data.containsKey('genre')) {
+      context.handle(
+        _genreMeta,
+        genre.isAcceptableOrUnknown(data['genre']!, _genreMeta),
+      );
+    }
     if (data.containsKey('read_at')) {
       context.handle(
         _readAtMeta,
@@ -1515,6 +1787,18 @@ class $TrackSourceMetadataTable extends TrackSourceMetadata
         DriftSqlType.string,
         data['${effectivePrefix}release_info'],
       ),
+      trackNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track_number'],
+      ),
+      releaseYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}release_year'],
+      ),
+      genre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}genre'],
+      ),
       readAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}read_at'],
@@ -1535,6 +1819,9 @@ class TrackSourceMetadataData extends DataClass
   final String? artist;
   final String? album;
   final String? releaseInfo;
+  final int? trackNumber;
+  final int? releaseYear;
+  final String? genre;
   final DateTime readAt;
   const TrackSourceMetadataData({
     required this.trackId,
@@ -1542,6 +1829,9 @@ class TrackSourceMetadataData extends DataClass
     this.artist,
     this.album,
     this.releaseInfo,
+    this.trackNumber,
+    this.releaseYear,
+    this.genre,
     required this.readAt,
   });
   @override
@@ -1559,6 +1849,15 @@ class TrackSourceMetadataData extends DataClass
     }
     if (!nullToAbsent || releaseInfo != null) {
       map['release_info'] = Variable<String>(releaseInfo);
+    }
+    if (!nullToAbsent || trackNumber != null) {
+      map['track_number'] = Variable<int>(trackNumber);
+    }
+    if (!nullToAbsent || releaseYear != null) {
+      map['release_year'] = Variable<int>(releaseYear);
+    }
+    if (!nullToAbsent || genre != null) {
+      map['genre'] = Variable<String>(genre);
     }
     map['read_at'] = Variable<DateTime>(readAt);
     return map;
@@ -1579,6 +1878,15 @@ class TrackSourceMetadataData extends DataClass
       releaseInfo: releaseInfo == null && nullToAbsent
           ? const Value.absent()
           : Value(releaseInfo),
+      trackNumber: trackNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trackNumber),
+      releaseYear: releaseYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releaseYear),
+      genre: genre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(genre),
       readAt: Value(readAt),
     );
   }
@@ -1594,6 +1902,9 @@ class TrackSourceMetadataData extends DataClass
       artist: serializer.fromJson<String?>(json['artist']),
       album: serializer.fromJson<String?>(json['album']),
       releaseInfo: serializer.fromJson<String?>(json['releaseInfo']),
+      trackNumber: serializer.fromJson<int?>(json['trackNumber']),
+      releaseYear: serializer.fromJson<int?>(json['releaseYear']),
+      genre: serializer.fromJson<String?>(json['genre']),
       readAt: serializer.fromJson<DateTime>(json['readAt']),
     );
   }
@@ -1606,6 +1917,9 @@ class TrackSourceMetadataData extends DataClass
       'artist': serializer.toJson<String?>(artist),
       'album': serializer.toJson<String?>(album),
       'releaseInfo': serializer.toJson<String?>(releaseInfo),
+      'trackNumber': serializer.toJson<int?>(trackNumber),
+      'releaseYear': serializer.toJson<int?>(releaseYear),
+      'genre': serializer.toJson<String?>(genre),
       'readAt': serializer.toJson<DateTime>(readAt),
     };
   }
@@ -1616,6 +1930,9 @@ class TrackSourceMetadataData extends DataClass
     Value<String?> artist = const Value.absent(),
     Value<String?> album = const Value.absent(),
     Value<String?> releaseInfo = const Value.absent(),
+    Value<int?> trackNumber = const Value.absent(),
+    Value<int?> releaseYear = const Value.absent(),
+    Value<String?> genre = const Value.absent(),
     DateTime? readAt,
   }) => TrackSourceMetadataData(
     trackId: trackId ?? this.trackId,
@@ -1623,6 +1940,9 @@ class TrackSourceMetadataData extends DataClass
     artist: artist.present ? artist.value : this.artist,
     album: album.present ? album.value : this.album,
     releaseInfo: releaseInfo.present ? releaseInfo.value : this.releaseInfo,
+    trackNumber: trackNumber.present ? trackNumber.value : this.trackNumber,
+    releaseYear: releaseYear.present ? releaseYear.value : this.releaseYear,
+    genre: genre.present ? genre.value : this.genre,
     readAt: readAt ?? this.readAt,
   );
   TrackSourceMetadataData copyWithCompanion(TrackSourceMetadataCompanion data) {
@@ -1634,6 +1954,13 @@ class TrackSourceMetadataData extends DataClass
       releaseInfo: data.releaseInfo.present
           ? data.releaseInfo.value
           : this.releaseInfo,
+      trackNumber: data.trackNumber.present
+          ? data.trackNumber.value
+          : this.trackNumber,
+      releaseYear: data.releaseYear.present
+          ? data.releaseYear.value
+          : this.releaseYear,
+      genre: data.genre.present ? data.genre.value : this.genre,
       readAt: data.readAt.present ? data.readAt.value : this.readAt,
     );
   }
@@ -1646,14 +1973,26 @@ class TrackSourceMetadataData extends DataClass
           ..write('artist: $artist, ')
           ..write('album: $album, ')
           ..write('releaseInfo: $releaseInfo, ')
+          ..write('trackNumber: $trackNumber, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('genre: $genre, ')
           ..write('readAt: $readAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(trackId, title, artist, album, releaseInfo, readAt);
+  int get hashCode => Object.hash(
+    trackId,
+    title,
+    artist,
+    album,
+    releaseInfo,
+    trackNumber,
+    releaseYear,
+    genre,
+    readAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1663,6 +2002,9 @@ class TrackSourceMetadataData extends DataClass
           other.artist == this.artist &&
           other.album == this.album &&
           other.releaseInfo == this.releaseInfo &&
+          other.trackNumber == this.trackNumber &&
+          other.releaseYear == this.releaseYear &&
+          other.genre == this.genre &&
           other.readAt == this.readAt);
 }
 
@@ -1673,6 +2015,9 @@ class TrackSourceMetadataCompanion
   final Value<String?> artist;
   final Value<String?> album;
   final Value<String?> releaseInfo;
+  final Value<int?> trackNumber;
+  final Value<int?> releaseYear;
+  final Value<String?> genre;
   final Value<DateTime> readAt;
   const TrackSourceMetadataCompanion({
     this.trackId = const Value.absent(),
@@ -1680,6 +2025,9 @@ class TrackSourceMetadataCompanion
     this.artist = const Value.absent(),
     this.album = const Value.absent(),
     this.releaseInfo = const Value.absent(),
+    this.trackNumber = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.genre = const Value.absent(),
     this.readAt = const Value.absent(),
   });
   TrackSourceMetadataCompanion.insert({
@@ -1688,6 +2036,9 @@ class TrackSourceMetadataCompanion
     this.artist = const Value.absent(),
     this.album = const Value.absent(),
     this.releaseInfo = const Value.absent(),
+    this.trackNumber = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.genre = const Value.absent(),
     required DateTime readAt,
   }) : readAt = Value(readAt);
   static Insertable<TrackSourceMetadataData> custom({
@@ -1696,6 +2047,9 @@ class TrackSourceMetadataCompanion
     Expression<String>? artist,
     Expression<String>? album,
     Expression<String>? releaseInfo,
+    Expression<int>? trackNumber,
+    Expression<int>? releaseYear,
+    Expression<String>? genre,
     Expression<DateTime>? readAt,
   }) {
     return RawValuesInsertable({
@@ -1704,6 +2058,9 @@ class TrackSourceMetadataCompanion
       if (artist != null) 'artist': artist,
       if (album != null) 'album': album,
       if (releaseInfo != null) 'release_info': releaseInfo,
+      if (trackNumber != null) 'track_number': trackNumber,
+      if (releaseYear != null) 'release_year': releaseYear,
+      if (genre != null) 'genre': genre,
       if (readAt != null) 'read_at': readAt,
     });
   }
@@ -1714,6 +2071,9 @@ class TrackSourceMetadataCompanion
     Value<String?>? artist,
     Value<String?>? album,
     Value<String?>? releaseInfo,
+    Value<int?>? trackNumber,
+    Value<int?>? releaseYear,
+    Value<String?>? genre,
     Value<DateTime>? readAt,
   }) {
     return TrackSourceMetadataCompanion(
@@ -1722,6 +2082,9 @@ class TrackSourceMetadataCompanion
       artist: artist ?? this.artist,
       album: album ?? this.album,
       releaseInfo: releaseInfo ?? this.releaseInfo,
+      trackNumber: trackNumber ?? this.trackNumber,
+      releaseYear: releaseYear ?? this.releaseYear,
+      genre: genre ?? this.genre,
       readAt: readAt ?? this.readAt,
     );
   }
@@ -1744,6 +2107,15 @@ class TrackSourceMetadataCompanion
     if (releaseInfo.present) {
       map['release_info'] = Variable<String>(releaseInfo.value);
     }
+    if (trackNumber.present) {
+      map['track_number'] = Variable<int>(trackNumber.value);
+    }
+    if (releaseYear.present) {
+      map['release_year'] = Variable<int>(releaseYear.value);
+    }
+    if (genre.present) {
+      map['genre'] = Variable<String>(genre.value);
+    }
     if (readAt.present) {
       map['read_at'] = Variable<DateTime>(readAt.value);
     }
@@ -1758,6 +2130,9 @@ class TrackSourceMetadataCompanion
           ..write('artist: $artist, ')
           ..write('album: $album, ')
           ..write('releaseInfo: $releaseInfo, ')
+          ..write('trackNumber: $trackNumber, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('genre: $genre, ')
           ..write('readAt: $readAt')
           ..write(')'))
         .toString();
@@ -2032,6 +2407,7 @@ typedef $$TracksTableCreateCompanionBuilder =
       required int libraryFolderId,
       required String filePath,
       required String fileExtension,
+      Value<int?> durationMs,
       Value<DateTime?> removedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -2042,6 +2418,7 @@ typedef $$TracksTableUpdateCompanionBuilder =
       Value<int> libraryFolderId,
       Value<String> filePath,
       Value<String> fileExtension,
+      Value<int?> durationMs,
       Value<DateTime?> removedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -2073,6 +2450,11 @@ class $$TracksTableFilterComposer
 
   ColumnFilters<String> get fileExtension => $composableBuilder(
     column: $table.fileExtension,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2121,6 +2503,11 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get removedAt => $composableBuilder(
     column: $table.removedAt,
     builder: (column) => ColumnOrderings(column),
@@ -2159,6 +2546,11 @@ class $$TracksTableAnnotationComposer
 
   GeneratedColumn<String> get fileExtension => $composableBuilder(
     column: $table.fileExtension,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
     builder: (column) => column,
   );
 
@@ -2204,6 +2596,7 @@ class $$TracksTableTableManager
                 Value<int> libraryFolderId = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> fileExtension = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
                 Value<DateTime?> removedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -2212,6 +2605,7 @@ class $$TracksTableTableManager
                 libraryFolderId: libraryFolderId,
                 filePath: filePath,
                 fileExtension: fileExtension,
+                durationMs: durationMs,
                 removedAt: removedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -2222,6 +2616,7 @@ class $$TracksTableTableManager
                 required int libraryFolderId,
                 required String filePath,
                 required String fileExtension,
+                Value<int?> durationMs = const Value.absent(),
                 Value<DateTime?> removedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -2230,6 +2625,7 @@ class $$TracksTableTableManager
                 libraryFolderId: libraryFolderId,
                 filePath: filePath,
                 fileExtension: fileExtension,
+                durationMs: durationMs,
                 removedAt: removedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -2263,6 +2659,9 @@ typedef $$TrackMetadataTableCreateCompanionBuilder =
       Value<String?> artist,
       Value<String?> album,
       Value<String?> releaseInfo,
+      Value<int?> trackNumber,
+      Value<int?> releaseYear,
+      Value<String?> genre,
       required DateTime updatedAt,
     });
 typedef $$TrackMetadataTableUpdateCompanionBuilder =
@@ -2272,6 +2671,9 @@ typedef $$TrackMetadataTableUpdateCompanionBuilder =
       Value<String?> artist,
       Value<String?> album,
       Value<String?> releaseInfo,
+      Value<int?> trackNumber,
+      Value<int?> releaseYear,
+      Value<String?> genre,
       Value<DateTime> updatedAt,
     });
 
@@ -2306,6 +2708,21 @@ class $$TrackMetadataTableFilterComposer
 
   ColumnFilters<String> get releaseInfo => $composableBuilder(
     column: $table.releaseInfo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get genre => $composableBuilder(
+    column: $table.genre,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2349,6 +2766,21 @@ class $$TrackMetadataTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get genre => $composableBuilder(
+    column: $table.genre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -2380,6 +2812,19 @@ class $$TrackMetadataTableAnnotationComposer
     column: $table.releaseInfo,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get genre =>
+      $composableBuilder(column: $table.genre, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -2427,6 +2872,9 @@ class $$TrackMetadataTableTableManager
                 Value<String?> artist = const Value.absent(),
                 Value<String?> album = const Value.absent(),
                 Value<String?> releaseInfo = const Value.absent(),
+                Value<int?> trackNumber = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> genre = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TrackMetadataCompanion(
                 trackId: trackId,
@@ -2434,6 +2882,9 @@ class $$TrackMetadataTableTableManager
                 artist: artist,
                 album: album,
                 releaseInfo: releaseInfo,
+                trackNumber: trackNumber,
+                releaseYear: releaseYear,
+                genre: genre,
                 updatedAt: updatedAt,
               ),
           createCompanionCallback:
@@ -2443,6 +2894,9 @@ class $$TrackMetadataTableTableManager
                 Value<String?> artist = const Value.absent(),
                 Value<String?> album = const Value.absent(),
                 Value<String?> releaseInfo = const Value.absent(),
+                Value<int?> trackNumber = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> genre = const Value.absent(),
                 required DateTime updatedAt,
               }) => TrackMetadataCompanion.insert(
                 trackId: trackId,
@@ -2450,6 +2904,9 @@ class $$TrackMetadataTableTableManager
                 artist: artist,
                 album: album,
                 releaseInfo: releaseInfo,
+                trackNumber: trackNumber,
+                releaseYear: releaseYear,
+                genre: genre,
                 updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -2488,6 +2945,9 @@ typedef $$TrackSourceMetadataTableCreateCompanionBuilder =
       Value<String?> artist,
       Value<String?> album,
       Value<String?> releaseInfo,
+      Value<int?> trackNumber,
+      Value<int?> releaseYear,
+      Value<String?> genre,
       required DateTime readAt,
     });
 typedef $$TrackSourceMetadataTableUpdateCompanionBuilder =
@@ -2497,6 +2957,9 @@ typedef $$TrackSourceMetadataTableUpdateCompanionBuilder =
       Value<String?> artist,
       Value<String?> album,
       Value<String?> releaseInfo,
+      Value<int?> trackNumber,
+      Value<int?> releaseYear,
+      Value<String?> genre,
       Value<DateTime> readAt,
     });
 
@@ -2531,6 +2994,21 @@ class $$TrackSourceMetadataTableFilterComposer
 
   ColumnFilters<String> get releaseInfo => $composableBuilder(
     column: $table.releaseInfo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get genre => $composableBuilder(
+    column: $table.genre,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2574,6 +3052,21 @@ class $$TrackSourceMetadataTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get genre => $composableBuilder(
+    column: $table.genre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get readAt => $composableBuilder(
     column: $table.readAt,
     builder: (column) => ColumnOrderings(column),
@@ -2605,6 +3098,19 @@ class $$TrackSourceMetadataTableAnnotationComposer
     column: $table.releaseInfo,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get trackNumber => $composableBuilder(
+    column: $table.trackNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get genre =>
+      $composableBuilder(column: $table.genre, builder: (column) => column);
 
   GeneratedColumn<DateTime> get readAt =>
       $composableBuilder(column: $table.readAt, builder: (column) => column);
@@ -2658,6 +3164,9 @@ class $$TrackSourceMetadataTableTableManager
                 Value<String?> artist = const Value.absent(),
                 Value<String?> album = const Value.absent(),
                 Value<String?> releaseInfo = const Value.absent(),
+                Value<int?> trackNumber = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> genre = const Value.absent(),
                 Value<DateTime> readAt = const Value.absent(),
               }) => TrackSourceMetadataCompanion(
                 trackId: trackId,
@@ -2665,6 +3174,9 @@ class $$TrackSourceMetadataTableTableManager
                 artist: artist,
                 album: album,
                 releaseInfo: releaseInfo,
+                trackNumber: trackNumber,
+                releaseYear: releaseYear,
+                genre: genre,
                 readAt: readAt,
               ),
           createCompanionCallback:
@@ -2674,6 +3186,9 @@ class $$TrackSourceMetadataTableTableManager
                 Value<String?> artist = const Value.absent(),
                 Value<String?> album = const Value.absent(),
                 Value<String?> releaseInfo = const Value.absent(),
+                Value<int?> trackNumber = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> genre = const Value.absent(),
                 required DateTime readAt,
               }) => TrackSourceMetadataCompanion.insert(
                 trackId: trackId,
@@ -2681,6 +3196,9 @@ class $$TrackSourceMetadataTableTableManager
                 artist: artist,
                 album: album,
                 releaseInfo: releaseInfo,
+                trackNumber: trackNumber,
+                releaseYear: releaseYear,
+                genre: genre,
                 readAt: readAt,
               ),
           withReferenceMapper: (p0) => p0

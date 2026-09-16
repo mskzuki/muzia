@@ -162,6 +162,10 @@ class PersistentMusicRepository implements MusicRepository {
           artist: metadata?.artist,
           album: metadata?.album,
           releaseInfo: metadata?.releaseInfo,
+          durationMs: row.durationMs,
+          trackNumber: metadata?.trackNumber,
+          releaseYear: metadata?.releaseYear,
+          genre: metadata?.genre,
           isRemoved: row.removedAt != null,
         ),
       );
@@ -244,6 +248,7 @@ class PersistentMusicRepository implements MusicRepository {
                 libraryFolderId: folderId,
                 filePath: track.filePath,
                 fileExtension: track.fileExtension,
+                durationMs: Value(track.durationMs),
                 removedAt: Value(track.isRemoved ? now : null),
                 createdAt: now,
                 updatedAt: now,
@@ -258,6 +263,9 @@ class PersistentMusicRepository implements MusicRepository {
                 artist: Value(track.artist),
                 album: Value(track.album),
                 releaseInfo: Value(track.releaseInfo),
+                trackNumber: Value(track.trackNumber),
+                releaseYear: Value(track.releaseYear),
+                genre: Value(track.genre),
                 updatedAt: now,
               ),
             );
@@ -270,6 +278,9 @@ class PersistentMusicRepository implements MusicRepository {
                 artist: Value(track.artist),
                 album: Value(track.album),
                 releaseInfo: Value(track.releaseInfo),
+                trackNumber: Value(track.trackNumber),
+                releaseYear: Value(track.releaseYear),
+                genre: Value(track.genre),
                 readAt: now,
               ),
             );
@@ -304,6 +315,13 @@ class PersistentMusicRepository implements MusicRepository {
             artist: _column(values, MetadataField.artist),
             album: _column(values, MetadataField.album),
             releaseInfo: _column(values, MetadataField.releaseInfo),
+            trackNumber: values.changes(MetadataField.trackNumber)
+                ? Value(values.trackNumber)
+                : const Value.absent(),
+            releaseYear: values.changes(MetadataField.releaseYear)
+                ? Value(values.releaseYear)
+                : const Value.absent(),
+            genre: _column(values, MetadataField.genre),
             updatedAt: Value(now),
           ),
         );

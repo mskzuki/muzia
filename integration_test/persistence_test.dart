@@ -20,6 +20,10 @@ void main() {
       title: 'Persisted song',
       artist: 'Artist',
       album: 'Album',
+      durationMs: 215000,
+      trackNumber: 3,
+      releaseYear: 2024,
+      genre: 'Jazz',
     );
     await repository.registerFolder('/tmp/music', const [track]);
 
@@ -31,5 +35,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Persisted song'), findsOneWidget);
+    // 再生時間・トラック番号・リリース年・ジャンルのUI表示は未対応のため、
+    // 再起動後の読み込みで値が保持されることをモデルで確認する。
+    expect(restoredViewModel.tracks.single, track);
   });
 }

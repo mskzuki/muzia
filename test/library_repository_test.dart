@@ -43,11 +43,9 @@ void main() {
       database,
       bookmarkService: const _CopyingBookmarkService(),
     );
-    await repository.registerFolder(
-      '/tmp/music',
-      const [Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3')],
-      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
-    );
+    await repository.registerFolder('/tmp/music', const [
+      Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3'),
+    ], securityScopedBookmark: Uint8List.fromList([1, 2, 3]));
     // 書き戻しが起きたかどうかを updated_at の変化で判定する。
     final markedAt = DateTime.utc(2020);
     await database
@@ -68,11 +66,9 @@ void main() {
       database,
       bookmarkService: const _RefreshingBookmarkService(),
     );
-    await repository.registerFolder(
-      '/tmp/music',
-      const [Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3')],
-      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
-    );
+    await repository.registerFolder('/tmp/music', const [
+      Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3'),
+    ], securityScopedBookmark: Uint8List.fromList([1, 2, 3]));
     final markedAt = DateTime.utc(2020);
     await database
         .update(database.libraryFolders)
@@ -92,11 +88,9 @@ void main() {
     await PersistentMusicRepository(
       database,
       bookmarkService: _FakeBookmarkService(),
-    ).registerFolder(
-      '/tmp/music',
-      const [track],
-      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
-    );
+    ).registerFolder('/tmp/music', const [
+      track,
+    ], securityScopedBookmark: Uint8List.fromList([1, 2, 3]));
 
     final restored = PersistentMusicRepository(
       database,
@@ -116,11 +110,9 @@ void main() {
     await PersistentMusicRepository(
       database,
       bookmarkService: _FakeBookmarkService(),
-    ).registerFolder(
-      '/tmp/music',
-      const [track],
-      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
-    );
+    ).registerFolder('/tmp/music', const [
+      track,
+    ], securityScopedBookmark: Uint8List.fromList([1, 2, 3]));
 
     final restored = PersistentMusicRepository(
       database,
@@ -142,11 +134,9 @@ void main() {
     );
     const track = Track(filePath: '/tmp/song.mp3', fileExtension: '.mp3');
 
-    await repository.registerFolder(
-      '/tmp/music',
-      const [track],
-      securityScopedBookmark: Uint8List.fromList([1, 2, 3]),
-    );
+    await repository.registerFolder('/tmp/music', const [
+      track,
+    ], securityScopedBookmark: Uint8List.fromList([1, 2, 3]));
     await repository.load();
 
     expect(repository.folderAccessLost, isFalse);
@@ -188,6 +178,68 @@ void main() {
     )).getSingle();
     expect(source.title, 'Song');
     expect(source.artist, 'Artist');
+  });
+
+  test('再生時間・トラック番号・リリース年・ジャンルを保存して復元する', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    const track = Track(
+      filePath: '/tmp/song.mp3',
+      fileExtension: '.mp3',
+      title: 'Song',
+      durationMs: 215000,
+      trackNumber: 3,
+      releaseYear: 2024,
+      genre: 'Jazz',
+    );
+
+    await repository.registerFolder('/tmp/music', const [track]);
+    final restored = PersistentMusicRepository(database);
+    await restored.load();
+
+    expect(restored.tracks.single, track);
+    // 元データにもタグから読み込んだ値を保持する。
+    final source = await (database.select(
+      database.trackSourceMetadata,
+    )).getSingle();
+    expect(source.trackNumber, 3);
+    expect(source.releaseYear, 2024);
+    expect(source.genre, 'Jazz');
+  });
+
+  test('一括編集で新項目だけを更新し、対象外と再生時間を保持する', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    const track = Track(
+      filePath: '/tmp/song.mp3',
+      fileExtension: '.mp3',
+      title: 'Song',
+      durationMs: 215000,
+      trackNumber: 3,
+      releaseYear: 2024,
+      genre: 'Jazz',
+    );
+
+    await repository.registerFolder('/tmp/music', const [track]);
+    await repository.updateMetadataMany(
+      [track.filePath],
+      const MetadataValues.partial(
+        fields: {MetadataField.releaseYear, MetadataField.genre},
+        releaseYear: 1999,
+        genre: 'Rock',
+      ),
+    );
+    final restored = PersistentMusicRepository(database);
+    await restored.load();
+
+    final saved = restored.tracks.single;
+    expect(saved.releaseYear, 1999);
+    expect(saved.genre, 'Rock');
+    expect(saved.trackNumber, 3);
+    expect(saved.title, 'Song');
+    expect(saved.durationMs, 215000);
   });
 
   test('新しいフォルダの登録時に以前の楽曲を置き換える', () async {
@@ -315,7 +367,7 @@ void main() {
     expect(saved.album, 'Original album');
   });
 
-  test('個別編集は4項目すべてを対象とし、空欄はnullとして反映する', () async {
+  test('既定コンストラクタは全項目を対象とし、空欄はnullとして反映する', () async {
     final database = LibraryDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = PersistentMusicRepository(database);
@@ -329,7 +381,7 @@ void main() {
     );
 
     await repository.registerFolder('/tmp/music', const [track]);
-    // 既定コンストラクタは4項目すべてが対象。個別編集フォームの挙動。
+    // 既定コンストラクタは全項目が対象。フォームが現在値を全て持つ場合の挙動。
     await repository.updateMetadata(
       track.filePath,
       values: const MetadataValues(title: 'New title'),

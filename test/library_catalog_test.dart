@@ -49,6 +49,32 @@ void main() {
     expect(catalog.albumsFor('Beta'), ['B']);
   });
 
+  test('既存ジャンル一覧を重複なしで大文字小文字を無視して並べる', () {
+    const genreTracks = [
+      Track(filePath: 'g1.mp3', fileExtension: '.mp3', genre: 'rock'),
+      Track(filePath: 'g2.mp3', fileExtension: '.mp3', genre: 'Jazz'),
+      Track(filePath: 'g3.mp3', fileExtension: '.mp3', genre: 'Jazz'),
+      Track(filePath: 'g4.mp3', fileExtension: '.mp3', genre: '  '),
+      Track(filePath: 'g5.mp3', fileExtension: '.mp3'),
+      // 削除済み楽曲のジャンルはサジェストに含めない。
+      Track(
+        filePath: 'g6.mp3',
+        fileExtension: '.mp3',
+        genre: 'Ambient',
+        isRemoved: true,
+      ),
+      // アーティスト未設定でもジャンルは対象にする。
+      Track(
+        filePath: 'g7.mp3',
+        fileExtension: '.mp3',
+        artist: '',
+        genre: 'Classical',
+      ),
+    ];
+    final catalog = LibraryCatalog(genreTracks);
+    expect(catalog.genres, ['Classical', 'Jazz', 'rock']);
+  });
+
   test('アーティストとアルバムから楽曲を絞り込む', () {
     final catalog = LibraryCatalog(tracks);
     expect(

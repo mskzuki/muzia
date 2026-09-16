@@ -13,4 +13,30 @@ void main() {
 
     expect(() => AudioMetadataService().read(file), throwsA(isA<Object>()));
   });
+
+  test('タグから再生時間・トラック番号・年・ジャンルを取り込む', () async {
+    final track = await AudioMetadataService().read(
+      File('test/fixtures/tagged.mp3'),
+    );
+
+    expect(track.title, 'Tagged Song');
+    expect(track.artist, 'Tagged Artist');
+    expect(track.album, 'Tagged Album');
+    expect(track.trackNumber, 7);
+    expect(track.releaseYear, 2021);
+    expect(track.genre, 'Rock');
+    // 1秒の無音ファイル。MP3の再生時間は推定値のため幅を持たせる。
+    expect(track.durationMs, isNotNull);
+    expect(track.durationMs, inInclusiveRange(500, 2000));
+  });
+
+  test('タグにない項目はnullとして読み込む', () async {
+    final track = await AudioMetadataService().read(
+      File('test/fixtures/untagged.mp3'),
+    );
+
+    expect(track.trackNumber, isNull);
+    expect(track.releaseYear, isNull);
+    expect(track.genre, isNull);
+  });
 }

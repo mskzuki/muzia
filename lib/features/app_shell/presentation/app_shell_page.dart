@@ -10,6 +10,7 @@ import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
 import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
+import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/library_search.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
@@ -385,6 +386,7 @@ class _MainContent extends StatelessWidget {
           )
         : _TrackTable(
             tracks: visibleTracks,
+            genreSuggestions: LibraryCatalog(libraryViewModel.tracks).genres,
             onRemove: libraryViewModel.removeTracks,
             onEdit: (track, values) =>
                 libraryViewModel.updateTrackMetadata(track, values),
@@ -535,6 +537,7 @@ class _EmptyLibrary extends StatelessWidget {
 class _TrackTable extends StatefulWidget {
   const _TrackTable({
     required this.tracks,
+    required this.genreSuggestions,
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
@@ -543,6 +546,9 @@ class _TrackTable extends StatefulWidget {
   });
 
   final List<Track> tracks;
+
+  /// 曲編集ダイアログのジャンル候補（ライブラリ全体の既存ジャンル）。
+  final List<String> genreSuggestions;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
@@ -578,7 +584,10 @@ class _TrackTableState extends State<_TrackTable> {
   Future<void> _editTrack(Track track) async {
     final values = await showDialog<MetadataValues>(
       context: context,
-      builder: (context) => MetadataEditDialog(track: track),
+      builder: (context) => MetadataEditDialog(
+        track: track,
+        genreSuggestions: widget.genreSuggestions,
+      ),
     );
     if (values != null) await widget.onEdit(track, values);
   }
@@ -718,9 +727,7 @@ class _TrackTableState extends State<_TrackTable> {
         await _editTrack(track);
       case 'remove':
         final selected = _selectedTracks;
-        await _confirmRemove(
-          selected.contains(track) ? selected : [track],
-        );
+        await _confirmRemove(selected.contains(track) ? selected : [track]);
       case _:
         break;
     }
@@ -770,27 +777,19 @@ class _TrackTableState extends State<_TrackTable> {
             number: Text(
               '#',
               textAlign: TextAlign.right,
-              style: MuziaTextStyles.caption.copyWith(
-                color: colors.fgTertiary,
-              ),
+              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
             ),
             title: Text(
               'タイトル',
-              style: MuziaTextStyles.caption.copyWith(
-                color: colors.fgTertiary,
-              ),
+              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
             ),
             artist: Text(
               'アーティスト',
-              style: MuziaTextStyles.caption.copyWith(
-                color: colors.fgTertiary,
-              ),
+              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
             ),
             album: Text(
               'アルバム',
-              style: MuziaTextStyles.caption.copyWith(
-                color: colors.fgTertiary,
-              ),
+              style: MuziaTextStyles.caption.copyWith(color: colors.fgTertiary),
             ),
           ),
         ),

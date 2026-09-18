@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:muzia/features/library/data/directory_service.dart';
+import 'package:muzia/features/library/data/file_availability_service.dart';
 import 'package:muzia/features/library/data/file_picker_service.dart';
 import 'package:muzia/features/library/data/file_scanner_service.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
@@ -17,18 +18,23 @@ class LibraryViewModel extends ChangeNotifier {
     DirectoryService? directoryService,
     MusicRepository? repository,
     SecurityScopedBookmarkService? bookmarkService,
+    FileAvailabilityService? availabilityService,
   }) : _picker = picker ?? NativeFilePickerService(),
        _scanner = scanner ?? LocalFileScannerService(),
        _directoryService = directoryService ?? NativeDirectoryService(),
        _repository = repository ?? InMemoryMusicRepository(),
        _bookmarkService =
-           bookmarkService ?? const NoopSecurityScopedBookmarkService();
+           bookmarkService ?? const NoopSecurityScopedBookmarkService(),
+       // 実ファイルを持たない構成（テスト・インメモリ）では常に利用可能とみなす。
+       _availabilityService =
+           availabilityService ?? const AlwaysAvailableFileService();
 
   LibraryViewModel.persistent({
     FilePickerService? picker,
     FileScannerService? scanner,
     DirectoryService? directoryService,
     SecurityScopedBookmarkService? bookmarkService,
+    FileAvailabilityService? availabilityService,
   }) : this(
          picker: picker,
          scanner: scanner,
@@ -38,6 +44,8 @@ class LibraryViewModel extends ChangeNotifier {
          ),
          bookmarkService:
              bookmarkService ?? NativeSecurityScopedBookmarkService(),
+         availabilityService:
+             availabilityService ?? const NativeFileAvailabilityService(),
        );
 
   final FilePickerService _picker;
@@ -45,6 +53,7 @@ class LibraryViewModel extends ChangeNotifier {
   final DirectoryService _directoryService;
   final MusicRepository _repository;
   final SecurityScopedBookmarkService _bookmarkService;
+  final FileAvailabilityService _availabilityService;
   LibraryStatus _status = LibraryStatus.empty;
   List<Track> _tracks = const [];
   String? _errorMessage;
@@ -52,6 +61,10 @@ class LibraryViewModel extends ChangeNotifier {
   String? _warningMessage;
   int _failureRevision = 0;
   bool _initialized = false;
+  bool _unavailableBannerDismissed = false;
+
+  /// 閉じたバナーは、利用不可の楽曲の組み合わせが変わるまで再表示しない。
+  Set<String> _dismissedUnavailablePaths = const {};
 
   LibraryStatus get status => _status;
   List<Track> get tracks => List.unmodifiable(_tracks);
@@ -60,6 +73,29 @@ class LibraryViewModel extends ChangeNotifier {
   String? get warningTitle => _warningTitle;
   String? get warningMessage => _warningMessage;
   int get failureRevision => _failureRevision;
+
+  /// ファイルが見つからない楽曲（ライブラリから削除されたものは除く）。
+  List<Track> get unavailableTracks => _tracks
+      .where((track) => !track.isRemoved && !track.isAvailable)
+      .toList(growable: false);
+
+  /// 欠損ファイルのバナーを表示するか。✕で閉じると、利用不可の楽曲の組み合わせが
+  /// 変わるまで非表示にする。
+  bool get showsUnavailableBanner {
+    final paths = unavailableTracks.map((track) => track.filePath).toSet();
+    if (paths.isEmpty) return false;
+    return !(_unavailableBannerDismissed &&
+        _dismissedUnavailablePaths.length == paths.length &&
+        _dismissedUnavailablePaths.containsAll(paths));
+  }
+
+  void dismissUnavailableBanner() {
+    _unavailableBannerDismissed = true;
+    _dismissedUnavailablePaths = unavailableTracks
+        .map((track) => track.filePath)
+        .toSet();
+    notifyListeners();
+  }
 
   /// 楽曲一覧を表示できる状態かどうか。`ready` と `readyWithWarnings` は
   /// 警告の有無が違うだけで、一覧の表示可否としては同じ扱いになる。
@@ -76,6 +112,9 @@ class LibraryViewModel extends ChangeNotifier {
     try {
       await _repository.load();
       _tracks = _repository.tracks;
+      if (_tracks.isNotEmpty && !_repository.folderAccessLost) {
+        await _refreshAvailability();
+      }
       if (_tracks.isEmpty) {
         _status = LibraryStatus.empty;
       } else if (_repository.folderAccessLost) {
@@ -194,6 +233,27 @@ class LibraryViewModel extends ChangeNotifier {
         preserveExistingTracks: preserveExistingTracks,
         preservedStatus: previousStatus,
       );
+    }
+  }
+
+  /// 各楽曲のファイルが存在するかを確認し、変化があれば永続化する。
+  /// フォルダのアクセス権を失っている場合は判定できないため呼ばない。
+  Future<void> _refreshAvailability() async {
+    final nowUnavailable = <String>[];
+    final nowAvailable = <String>[];
+    for (final track in _tracks.where((track) => !track.isRemoved)) {
+      final exists = await _availabilityService.exists(track.filePath);
+      if (!exists && track.isAvailable) nowUnavailable.add(track.filePath);
+      if (exists && !track.isAvailable) nowAvailable.add(track.filePath);
+    }
+    if (nowUnavailable.isNotEmpty) {
+      await _repository.markUnavailableMany(nowUnavailable, true);
+    }
+    if (nowAvailable.isNotEmpty) {
+      await _repository.markUnavailableMany(nowAvailable, false);
+    }
+    if (nowUnavailable.isNotEmpty || nowAvailable.isNotEmpty) {
+      _tracks = _repository.tracks;
     }
   }
 

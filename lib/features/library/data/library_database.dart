@@ -21,6 +21,9 @@ class Tracks extends Table {
   /// 再生時間（ミリ秒）。ファイル由来の値で、ユーザーは編集できない。
   IntColumn get durationMs => integer().nullable()();
   DateTimeColumn get removedAt => dateTime().nullable()();
+
+  /// ファイルが見つからなくなった時刻。null なら利用可能。
+  DateTimeColumn get unavailableSince => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 }
@@ -62,7 +65,7 @@ class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -96,6 +99,9 @@ class LibraryDatabase extends _$LibraryDatabase {
               AND CAST(substr(trim(release_info), 1, 4) AS INTEGER) > 0
           ''');
         }
+      }
+      if (from < 5) {
+        await m.addColumn(tracks, tracks.unavailableSince);
       }
     },
   );

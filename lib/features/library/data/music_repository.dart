@@ -33,6 +33,9 @@ abstract interface class MusicRepository {
   );
   Future<void> markRemoved(String filePath, bool removed);
   Future<void> markRemovedMany(List<String> filePaths, bool removed);
+
+  /// ファイルの利用可否を記録する（[unavailable] が true なら見つからない状態）。
+  Future<void> markUnavailableMany(List<String> filePaths, bool unavailable);
 }
 
 class InMemoryMusicRepository implements MusicRepository {
@@ -92,6 +95,20 @@ class InMemoryMusicRepository implements MusicRepository {
         .map(
           (track) => filePaths.contains(track.filePath)
               ? track.copyWith(isRemoved: removed)
+              : track,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> markUnavailableMany(
+    List<String> filePaths,
+    bool unavailable,
+  ) async {
+    _tracks = _tracks
+        .map(
+          (track) => filePaths.contains(track.filePath)
+              ? track.copyWith(isAvailable: !unavailable)
               : track,
         )
         .toList(growable: false);
@@ -167,6 +184,7 @@ class PersistentMusicRepository implements MusicRepository {
           releaseYear: metadata?.releaseYear,
           genre: metadata?.genre,
           isRemoved: row.removedAt != null,
+          isAvailable: row.unavailableSince == null,
         ),
       );
     }
@@ -250,6 +268,7 @@ class PersistentMusicRepository implements MusicRepository {
                 fileExtension: track.fileExtension,
                 durationMs: Value(track.durationMs),
                 removedAt: Value(track.isRemoved ? now : null),
+                unavailableSince: Value(track.isAvailable ? null : now),
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -352,6 +371,27 @@ class PersistentMusicRepository implements MusicRepository {
     });
     await load();
   }
+
+  @override
+  Future<void> markUnavailableMany(
+    List<String> filePaths,
+    bool unavailable,
+  ) async {
+    final now = DateTime.now().toUtc();
+    await _database.transaction(() async {
+      for (final filePath in filePaths) {
+        await (_database.update(
+          _database.tracks,
+        )..where((table) => table.filePath.equals(filePath))).write(
+          TracksCompanion(
+            unavailableSince: Value(unavailable ? now : null),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+    });
+    await load();
+  }
 }
 
 /// 更新対象の項目だけを `UPDATE` に含める。対象外は [Value.absent] とし、
@@ -413,4 +453,10 @@ class LazyPersistentMusicRepository implements MusicRepository {
   @override
   Future<void> markRemovedMany(List<String> filePaths, bool removed) async =>
       (await _open()).markRemovedMany(filePaths, removed);
+
+  @override
+  Future<void> markUnavailableMany(
+    List<String> filePaths,
+    bool unavailable,
+  ) async => (await _open()).markUnavailableMany(filePaths, unavailable);
 }

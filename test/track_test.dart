@@ -75,5 +75,14 @@ void main() {
     expect(track == track.copyWith(trackNumber: 4), isFalse);
     expect(track == track.copyWith(releaseYear: 2000), isFalse);
     expect(track == track.copyWith(durationMs: 1), isFalse);
+    expect(track == track.copyWith(isAvailable: false), isFalse);
+    // 利用不可の状態はメタデータ更新で変わらない
+    expect(
+      track
+          .copyWith(isAvailable: false)
+          .replaceMetadata(const MetadataValues())
+          .isAvailable,
+      isFalse,
+    );
   });
 }

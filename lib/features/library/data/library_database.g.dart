@@ -561,6 +561,18 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _unavailableSinceMeta = const VerificationMeta(
+    'unavailableSince',
+  );
+  @override
+  late final GeneratedColumn<DateTime> unavailableSince =
+      GeneratedColumn<DateTime>(
+        'unavailable_since',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -591,6 +603,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     fileExtension,
     durationMs,
     removedAt,
+    unavailableSince,
     createdAt,
     updatedAt,
   ];
@@ -651,6 +664,15 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         removedAt.isAcceptableOrUnknown(data['removed_at']!, _removedAtMeta),
       );
     }
+    if (data.containsKey('unavailable_since')) {
+      context.handle(
+        _unavailableSinceMeta,
+        unavailableSince.isAcceptableOrUnknown(
+          data['unavailable_since']!,
+          _unavailableSinceMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -700,6 +722,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}removed_at'],
       ),
+      unavailableSince: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}unavailable_since'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -726,6 +752,9 @@ class Track extends DataClass implements Insertable<Track> {
   /// 再生時間（ミリ秒）。ファイル由来の値で、ユーザーは編集できない。
   final int? durationMs;
   final DateTime? removedAt;
+
+  /// ファイルが見つからなくなった時刻。null なら利用可能。
+  final DateTime? unavailableSince;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Track({
@@ -735,6 +764,7 @@ class Track extends DataClass implements Insertable<Track> {
     required this.fileExtension,
     this.durationMs,
     this.removedAt,
+    this.unavailableSince,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -750,6 +780,9 @@ class Track extends DataClass implements Insertable<Track> {
     }
     if (!nullToAbsent || removedAt != null) {
       map['removed_at'] = Variable<DateTime>(removedAt);
+    }
+    if (!nullToAbsent || unavailableSince != null) {
+      map['unavailable_since'] = Variable<DateTime>(unavailableSince);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -768,6 +801,9 @@ class Track extends DataClass implements Insertable<Track> {
       removedAt: removedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(removedAt),
+      unavailableSince: unavailableSince == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unavailableSince),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -785,6 +821,9 @@ class Track extends DataClass implements Insertable<Track> {
       fileExtension: serializer.fromJson<String>(json['fileExtension']),
       durationMs: serializer.fromJson<int?>(json['durationMs']),
       removedAt: serializer.fromJson<DateTime?>(json['removedAt']),
+      unavailableSince: serializer.fromJson<DateTime?>(
+        json['unavailableSince'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -799,6 +838,7 @@ class Track extends DataClass implements Insertable<Track> {
       'fileExtension': serializer.toJson<String>(fileExtension),
       'durationMs': serializer.toJson<int?>(durationMs),
       'removedAt': serializer.toJson<DateTime?>(removedAt),
+      'unavailableSince': serializer.toJson<DateTime?>(unavailableSince),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -811,6 +851,7 @@ class Track extends DataClass implements Insertable<Track> {
     String? fileExtension,
     Value<int?> durationMs = const Value.absent(),
     Value<DateTime?> removedAt = const Value.absent(),
+    Value<DateTime?> unavailableSince = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Track(
@@ -820,6 +861,9 @@ class Track extends DataClass implements Insertable<Track> {
     fileExtension: fileExtension ?? this.fileExtension,
     durationMs: durationMs.present ? durationMs.value : this.durationMs,
     removedAt: removedAt.present ? removedAt.value : this.removedAt,
+    unavailableSince: unavailableSince.present
+        ? unavailableSince.value
+        : this.unavailableSince,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -837,6 +881,9 @@ class Track extends DataClass implements Insertable<Track> {
           ? data.durationMs.value
           : this.durationMs,
       removedAt: data.removedAt.present ? data.removedAt.value : this.removedAt,
+      unavailableSince: data.unavailableSince.present
+          ? data.unavailableSince.value
+          : this.unavailableSince,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -851,6 +898,7 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('fileExtension: $fileExtension, ')
           ..write('durationMs: $durationMs, ')
           ..write('removedAt: $removedAt, ')
+          ..write('unavailableSince: $unavailableSince, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -865,6 +913,7 @@ class Track extends DataClass implements Insertable<Track> {
     fileExtension,
     durationMs,
     removedAt,
+    unavailableSince,
     createdAt,
     updatedAt,
   );
@@ -878,6 +927,7 @@ class Track extends DataClass implements Insertable<Track> {
           other.fileExtension == this.fileExtension &&
           other.durationMs == this.durationMs &&
           other.removedAt == this.removedAt &&
+          other.unavailableSince == this.unavailableSince &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -889,6 +939,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<String> fileExtension;
   final Value<int?> durationMs;
   final Value<DateTime?> removedAt;
+  final Value<DateTime?> unavailableSince;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TracksCompanion({
@@ -898,6 +949,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.fileExtension = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.removedAt = const Value.absent(),
+    this.unavailableSince = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -908,6 +960,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     required String fileExtension,
     this.durationMs = const Value.absent(),
     this.removedAt = const Value.absent(),
+    this.unavailableSince = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : libraryFolderId = Value(libraryFolderId),
@@ -922,6 +975,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<String>? fileExtension,
     Expression<int>? durationMs,
     Expression<DateTime>? removedAt,
+    Expression<DateTime>? unavailableSince,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -932,6 +986,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (fileExtension != null) 'file_extension': fileExtension,
       if (durationMs != null) 'duration_ms': durationMs,
       if (removedAt != null) 'removed_at': removedAt,
+      if (unavailableSince != null) 'unavailable_since': unavailableSince,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -944,6 +999,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<String>? fileExtension,
     Value<int?>? durationMs,
     Value<DateTime?>? removedAt,
+    Value<DateTime?>? unavailableSince,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -954,6 +1010,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       fileExtension: fileExtension ?? this.fileExtension,
       durationMs: durationMs ?? this.durationMs,
       removedAt: removedAt ?? this.removedAt,
+      unavailableSince: unavailableSince ?? this.unavailableSince,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -980,6 +1037,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (removedAt.present) {
       map['removed_at'] = Variable<DateTime>(removedAt.value);
     }
+    if (unavailableSince.present) {
+      map['unavailable_since'] = Variable<DateTime>(unavailableSince.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -998,6 +1058,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('fileExtension: $fileExtension, ')
           ..write('durationMs: $durationMs, ')
           ..write('removedAt: $removedAt, ')
+          ..write('unavailableSince: $unavailableSince, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2409,6 +2470,7 @@ typedef $$TracksTableCreateCompanionBuilder =
       required String fileExtension,
       Value<int?> durationMs,
       Value<DateTime?> removedAt,
+      Value<DateTime?> unavailableSince,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -2420,6 +2482,7 @@ typedef $$TracksTableUpdateCompanionBuilder =
       Value<String> fileExtension,
       Value<int?> durationMs,
       Value<DateTime?> removedAt,
+      Value<DateTime?> unavailableSince,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2460,6 +2523,11 @@ class $$TracksTableFilterComposer
 
   ColumnFilters<DateTime> get removedAt => $composableBuilder(
     column: $table.removedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get unavailableSince => $composableBuilder(
+    column: $table.unavailableSince,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2513,6 +2581,11 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get unavailableSince => $composableBuilder(
+    column: $table.unavailableSince,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2557,6 +2630,11 @@ class $$TracksTableAnnotationComposer
   GeneratedColumn<DateTime> get removedAt =>
       $composableBuilder(column: $table.removedAt, builder: (column) => column);
 
+  GeneratedColumn<DateTime> get unavailableSince => $composableBuilder(
+    column: $table.unavailableSince,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2598,6 +2676,7 @@ class $$TracksTableTableManager
                 Value<String> fileExtension = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 Value<DateTime?> removedAt = const Value.absent(),
+                Value<DateTime?> unavailableSince = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TracksCompanion(
@@ -2607,6 +2686,7 @@ class $$TracksTableTableManager
                 fileExtension: fileExtension,
                 durationMs: durationMs,
                 removedAt: removedAt,
+                unavailableSince: unavailableSince,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2618,6 +2698,7 @@ class $$TracksTableTableManager
                 required String fileExtension,
                 Value<int?> durationMs = const Value.absent(),
                 Value<DateTime?> removedAt = const Value.absent(),
+                Value<DateTime?> unavailableSince = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => TracksCompanion.insert(
@@ -2627,6 +2708,7 @@ class $$TracksTableTableManager
                 fileExtension: fileExtension,
                 durationMs: durationMs,
                 removedAt: removedAt,
+                unavailableSince: unavailableSince,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

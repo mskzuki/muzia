@@ -13,6 +13,7 @@ class Track {
     this.releaseYear,
     this.genre,
     this.isRemoved = false,
+    this.isAvailable = true,
   });
 
   final String filePath;
@@ -31,6 +32,10 @@ class Track {
   final String? genre;
   final bool isRemoved;
 
+  /// ファイルが前回の確認時点で存在したか。移動・削除されていれば false
+  /// （ライブラリには残し、再生せずに理由を表示する）。
+  final bool isAvailable;
+
   Track copyWith({
     String? title,
     String? artist,
@@ -41,6 +46,7 @@ class Track {
     int? releaseYear,
     String? genre,
     bool? isRemoved,
+    bool? isAvailable,
   }) {
     return Track(
       filePath: filePath,
@@ -54,6 +60,7 @@ class Track {
       releaseYear: releaseYear ?? this.releaseYear,
       genre: genre ?? this.genre,
       isRemoved: isRemoved ?? this.isRemoved,
+      isAvailable: isAvailable ?? this.isAvailable,
     );
   }
 
@@ -89,6 +96,7 @@ class Track {
           : releaseYear,
       genre: values.changes(MetadataField.genre) ? values.genre : genre,
       isRemoved: isRemoved,
+      isAvailable: isAvailable,
     );
   }
 
@@ -105,7 +113,8 @@ class Track {
         other.trackNumber == trackNumber &&
         other.releaseYear == releaseYear &&
         other.genre == genre &&
-        other.isRemoved == isRemoved;
+        other.isRemoved == isRemoved &&
+        other.isAvailable == isAvailable;
   }
 
   @override
@@ -121,5 +130,6 @@ class Track {
     releaseYear,
     genre,
     isRemoved,
+    isAvailable,
   );
 }

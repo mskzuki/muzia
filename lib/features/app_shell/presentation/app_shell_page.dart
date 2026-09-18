@@ -43,6 +43,20 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
 
   static bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
 
+  /// ファイルが見つからない楽曲は再生を試みず、理由を表示する（FR-009）。
+  void _play(Track track) {
+    if (!track.isAvailable) {
+      final name = track.title?.isNotEmpty == true
+          ? track.title!
+          : track.filePath;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「$name」のファイルが見つかりません。移動または削除された可能性があります。')),
+      );
+      return;
+    }
+    unawaited(ref.read(playerViewModelProvider).play(track));
+  }
+
   void _openInBrowser(String? artist, String? album) {
     setState(() {
       _browserTarget = (artist, album);
@@ -126,7 +140,11 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
                 if (libraryViewModel.canShowTracks) ...[
                   const SizedBox(width: MuziaSpacing.s2),
                   Text(
-                    '${formatCount(libraryViewModel.tracks.length)}曲',
+                    [
+                      '${formatCount(libraryViewModel.tracks.length)}曲',
+                      if (libraryViewModel.unavailableTracks.isNotEmpty)
+                        '${formatCount(libraryViewModel.unavailableTracks.length)}曲が利用不可',
+                    ].join(' · '),
                     style: MuziaTextStyles.secondary.copyWith(
                       color: colors.fgTertiary,
                       fontFeatures: const [FontFeature.tabularFigures()],
@@ -174,7 +192,7 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
                         libraryViewModel: libraryViewModel,
                         section: _section,
                         searchQuery: _searchQuery,
-                        onPlay: playerViewModel.play,
+                        onPlay: _play,
                         playingPath: playerViewModel.track?.filePath,
                         playbackActive: playerViewModel.isPlaying,
                         onPickFolder: libraryViewModel.chooseAndScanFolder,
@@ -469,10 +487,58 @@ class _MainContent extends StatelessWidget {
         showsLibrary &&
         libraryViewModel.canShowTracks &&
         warningMessage != null;
+    final unavailable = libraryViewModel.unavailableTracks;
+    // 欠損ファイルのバナーは対処（削除）できるため、スキャン警告より上に置く。
+    // 両方ある場合は縦に並べて双方を表示する（要件4）。
     return Column(
       children: [
+        if (showsLibrary &&
+            libraryViewModel.canShowTracks &&
+            libraryViewModel.showsUnavailableBanner)
+          _WarningNotice(
+            key: const ValueKey('unavailable-banner'),
+            title: '${formatCount(unavailable.length)}曲が利用できません。',
+            message: 'ファイルが前回のスキャン以降に移動または削除されました。',
+            actions: [
+              Builder(
+                builder: (context) => TextButton(
+                  key: const ValueKey('unavailable-remove'),
+                  onPressed: () => unawaited(
+                    TrackActions(
+                      onPlay: onPlay,
+                      onEdit: libraryViewModel.updateTrackMetadata,
+                      onRemove: libraryViewModel.removeTracks,
+                    ).confirmRemove(context, unavailable),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(
+                      context,
+                    ).extension<MuziaColors>()!.warnText,
+                    textStyle: MuziaTextStyles.rowTitle,
+                    minimumSize: const Size(0, 28),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MuziaSpacing.s2,
+                    ),
+                  ),
+                  child: const Text('削除…'),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('unavailable-dismiss'),
+                tooltip: '閉じる',
+                icon: const Icon(Icons.close, size: 14),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: libraryViewModel.dismissUnavailableBanner,
+              ),
+            ],
+          ),
         if (showsWarning)
           _WarningNotice(
+            key: const ValueKey('warning-banner'),
             title: libraryViewModel.warningTitle ?? '警告',
             message: warningMessage,
           ),
@@ -482,17 +548,24 @@ class _MainContent extends StatelessWidget {
   }
 }
 
+/// ツールバー直下の amber バナー（`.banner`）。[actions] は右端に置く。
 class _WarningNotice extends StatelessWidget {
-  const _WarningNotice({required this.title, required this.message});
+  const _WarningNotice({
+    super.key,
+    required this.title,
+    required this.message,
+    this.actions = const [],
+  });
 
   final String title;
   final String message;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<MuziaColors>()!;
-    return KeyedSubtree(
-      key: const ValueKey('warning-banner'),
+    return IconTheme(
+      data: IconThemeData(color: colors.warnText),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -532,6 +605,10 @@ class _WarningNotice extends StatelessWidget {
                 ),
               ),
             ),
+            for (final action in actions) ...[
+              const SizedBox(width: MuziaSpacing.s2),
+              action,
+            ],
           ],
         ),
       ),
@@ -1044,12 +1121,20 @@ class _TrackRowState extends State<_TrackRow> {
         : widget.index.isOdd
         ? colors.rowStripe
         : Colors.transparent;
+    final unavailable = !widget.track.isAvailable;
+    // 利用不可の行は淡色化する（タイトルは secondary、それ以外は tertiary）。
     final titleColor = selected
         ? colors.onAccent
+        : unavailable
+        ? colors.fgSecondary
         : widget.playing
         ? colors.accentText
         : colors.fgPrimary;
-    final secondaryColor = selected ? colors.onAccent : colors.fgSecondary;
+    final secondaryColor = selected
+        ? colors.onAccent
+        : unavailable
+        ? colors.fgTertiary
+        : colors.fgSecondary;
     return Listener(
       onPointerDown: (event) {
         if (event.buttons == kSecondaryMouseButton) {
@@ -1086,12 +1171,22 @@ class _TrackRowState extends State<_TrackRow> {
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-            title: _HighlightedText(
-              widget.track.title?.isNotEmpty == true
-                  ? widget.track.title!
-                  : 'タイトル不明',
-              query: widget.highlightQuery,
-              style: MuziaTextStyles.rowTitle.copyWith(color: titleColor),
+            title: Row(
+              children: [
+                Flexible(
+                  child: _HighlightedText(
+                    widget.track.title?.isNotEmpty == true
+                        ? widget.track.title!
+                        : 'タイトル不明',
+                    query: widget.highlightQuery,
+                    style: MuziaTextStyles.rowTitle.copyWith(color: titleColor),
+                  ),
+                ),
+                if (unavailable) ...[
+                  const SizedBox(width: MuziaSpacing.s2),
+                  _UnavailableFlag(selected: selected),
+                ],
+              ],
             ),
             artist: _HighlightedText(
               widget.track.artist ?? 'アーティスト不明',
@@ -1104,7 +1199,7 @@ class _TrackRowState extends State<_TrackRow> {
               style: MuziaTextStyles.body.copyWith(color: secondaryColor),
             ),
             time: Text(
-              formatTrackDuration(widget.track.durationMs),
+              formatTrackDuration(unavailable ? null : widget.track.durationMs),
               textAlign: TextAlign.right,
               style: MuziaTextStyles.body.copyWith(
                 color: secondaryColor,
@@ -1215,6 +1310,41 @@ class _SearchFieldState extends State<_SearchField> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 利用不可の楽曲に付ける amber のフラグ（`.miss-flag`）。
+class _UnavailableFlag extends StatelessWidget {
+  const _UnavailableFlag({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final color = selected ? colors.onAccent : colors.warnText;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: selected ? colors.onAccent : colors.warn,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          '利用不可',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

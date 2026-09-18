@@ -395,6 +395,27 @@ void main() {
     expect(saved.album, isNull);
     expect(saved.releaseInfo, isNull);
   });
+
+  test('利用不可の状態を保存して復元し、解除できる', () async {
+    final database = LibraryDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = PersistentMusicRepository(database);
+    await repository.registerFolder('/tmp/music', const [
+      Track(filePath: '/tmp/a.mp3', fileExtension: '.mp3', title: 'A'),
+      Track(filePath: '/tmp/b.mp3', fileExtension: '.mp3', title: 'B'),
+    ]);
+
+    await repository.markUnavailableMany(['/tmp/a.mp3'], true);
+    final restored = PersistentMusicRepository(database);
+    await restored.load();
+    expect(restored.tracks.map((track) => track.isAvailable), [false, true]);
+    // メタデータや削除状態は影響を受けない
+    expect(restored.tracks.first.title, 'A');
+    expect(restored.tracks.first.isRemoved, isFalse);
+
+    await restored.markUnavailableMany(['/tmp/a.mp3'], false);
+    expect(restored.tracks.every((track) => track.isAvailable), isTrue);
+  });
 }
 
 /// MethodChannelは毎回新しい `Uint8List` を返す。内容が同じでもインスタンスは異なる。

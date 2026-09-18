@@ -126,6 +126,8 @@ void main() {
       expect(track.trackNumber, isNull);
       expect(track.genre, isNull);
     }
+    // v5 で追加した unavailable_since は null = 利用可能として読み込む。
+    expect(repository.tracks.every((track) => track.isAvailable), isTrue);
   });
 
   test('release_infoを年として解釈できる場合だけrelease_yearへ移行する', () async {

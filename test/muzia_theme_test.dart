@@ -46,6 +46,7 @@ void main() {
       expect(colors.rowDivider.a, closeTo(0.04, 0.01));
       expect(colors.accentBorder.a, closeTo(0.28, 0.02));
       expect(colors.warnBorder.a, closeTo(0.40, 0.02));
+      expect(colors.highlight.a, closeTo(0.24, 0.02));
     });
 
     test('ThemeDataへトークンを反映する', () {

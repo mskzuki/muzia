@@ -30,6 +30,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     required this.rowDivider,
     required this.accentBorder,
     required this.warnBorder,
+    required this.highlight,
   });
 
   final Color accent;
@@ -75,6 +76,9 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
   /// 警告面の縁取り（amber-a5。バナーの下罫線）。
   final Color warnBorder;
 
+  /// 検索一致箇所の背景（gold-a4）。
+  final Color highlight;
+
   /// Radixライトパレット（indigo / gray / amber / red）。
   static const light = MuziaColors(
     accent: Color(0xFF3E63DD), // indigo-9
@@ -103,6 +107,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     rowDivider: Color(0x0A000000), // gray-a2 ~4%
     accentBorder: Color(0x473E63DD), // indigo-a5 ~28%
     warnBorder: Color(0x66FFC53D), // amber-a5 ~40%
+    highlight: Color(0x3D978365), // gold-a4 ~24%
   );
 
   /// 同じRadixステップのダークパレット値。
@@ -133,6 +138,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     rowDivider: Color(0x0AFFFFFF), // gray-a2 (dark)
     accentBorder: Color(0x663E63DD), // indigo-a5 (dark)
     warnBorder: Color(0x66FFC53D), // amber-a5 (dark)
+    highlight: Color(0x52978365), // gold-a4 (dark)
   );
 
   @override
@@ -163,6 +169,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
     Color? rowDivider,
     Color? accentBorder,
     Color? warnBorder,
+    Color? highlight,
   }) {
     return MuziaColors(
       accent: accent ?? this.accent,
@@ -191,6 +198,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
       rowDivider: rowDivider ?? this.rowDivider,
       accentBorder: accentBorder ?? this.accentBorder,
       warnBorder: warnBorder ?? this.warnBorder,
+      highlight: highlight ?? this.highlight,
     );
   }
 
@@ -225,6 +233,7 @@ class MuziaColors extends ThemeExtension<MuziaColors> {
       rowDivider: mix(rowDivider, other.rowDivider),
       accentBorder: mix(accentBorder, other.accentBorder),
       warnBorder: mix(warnBorder, other.warnBorder),
+      highlight: mix(highlight, other.highlight),
     );
   }
 }

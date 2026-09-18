@@ -36,6 +36,22 @@ class AppShellPage extends ConsumerStatefulWidget {
 
 class _AppShellPageState extends ConsumerState<AppShellPage> {
   _LibrarySection _section = _LibrarySection.library;
+  final _searchFocusNode = FocusNode(debugLabel: 'library-search');
+
+  /// 検索結果のアルバム/アーティストから開くブラウザの初期選択。
+  (String? artist, String? album)? _browserTarget;
+
+  static bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
+
+  void _openInBrowser(String? artist, String? album) {
+    setState(() {
+      _browserTarget = (artist, album);
+      _section = _LibrarySection.artists;
+      _searchController.clear();
+      _searchQuery = '';
+    });
+  }
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -51,6 +67,7 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -76,85 +93,102 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
       _LibrarySection.albums => 'アルバム',
     };
     final catalog = LibraryCatalog(libraryViewModel.tracks);
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 52,
-        backgroundColor: colors.sidebarBg,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        shape: Border(bottom: BorderSide(color: colors.borderSubtle)),
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            // タイトルはサイドバー幅の右、コンテンツ列の上に置く（戻る/進むは見送り）。
-            const SizedBox(width: 224 + 18),
-            Text(
-              sectionTitle,
-              style: MuziaTextStyles.windowTitle.copyWith(
-                color: colors.fgPrimary,
-              ),
-            ),
-            if (libraryViewModel.canShowTracks) ...[
-              const SizedBox(width: MuziaSpacing.s2),
-              Text(
-                '${formatCount(libraryViewModel.tracks.length)}曲',
-                style: MuziaTextStyles.secondary.copyWith(
-                  color: colors.fgTertiary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          _SearchField(
-            controller: _searchController,
-            query: _searchQuery,
-            onChanged: (value) => setState(() => _searchQuery = value),
-            onClear: () {
-              _searchController.clear();
-              setState(() => _searchQuery = '');
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Row(
+    return CallbackShortcuts(
+      bindings: {
+        SingleActivator(
+          LogicalKeyboardKey.keyF,
+          meta: _isMac,
+          control: !_isMac,
+        ): _searchFocusNode.requestFocus,
+      },
+      // どこにもフォーカスがない状態でもショートカットが届くよう、ページ全体を
+      // フォーカス可能にする。
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          appBar: AppBar(
+            toolbarHeight: 52,
+            backgroundColor: colors.sidebarBg,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            shape: Border(bottom: BorderSide(color: colors.borderSubtle)),
+            titleSpacing: 0,
+            title: Row(
               children: [
-                _Sidebar(
-                  onPickFolder: libraryViewModel.chooseAndScanFolder,
-                  section: _section,
-                  trackCount: libraryViewModel.canShowTracks
-                      ? libraryViewModel.tracks.length
-                      : null,
-                  artistCount: libraryViewModel.canShowTracks
-                      ? catalog.artists.length
-                      : null,
-                  albumCount: libraryViewModel.canShowTracks
-                      ? catalog.albums.length
-                      : null,
-                  onSectionChanged: (section) =>
-                      setState(() => _section = section),
-                ),
-                Expanded(
-                  child: _MainContent(
-                    viewModel: viewModel,
-                    libraryViewModel: libraryViewModel,
-                    section: _section,
-                    searchQuery: _searchQuery,
-                    onPlay: playerViewModel.play,
-                    playingPath: playerViewModel.track?.filePath,
-                    playbackActive: playerViewModel.isPlaying,
-                    onPickFolder: libraryViewModel.chooseAndScanFolder,
+                // タイトルはサイドバー幅の右、コンテンツ列の上に置く（戻る/進むは見送り）。
+                const SizedBox(width: 224 + 18),
+                Text(
+                  sectionTitle,
+                  style: MuziaTextStyles.windowTitle.copyWith(
+                    color: colors.fgPrimary,
                   ),
                 ),
+                if (libraryViewModel.canShowTracks) ...[
+                  const SizedBox(width: MuziaSpacing.s2),
+                  Text(
+                    '${formatCount(libraryViewModel.tracks.length)}曲',
+                    style: MuziaTextStyles.secondary.copyWith(
+                      color: colors.fgTertiary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
               ],
             ),
+            actions: [
+              _SearchField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                query: _searchQuery,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                onClear: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              ),
+            ],
           ),
-          _PlayerArea(viewModel: playerViewModel),
-        ],
+          body: Column(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    _Sidebar(
+                      onPickFolder: libraryViewModel.chooseAndScanFolder,
+                      section: _section,
+                      trackCount: libraryViewModel.canShowTracks
+                          ? libraryViewModel.tracks.length
+                          : null,
+                      artistCount: libraryViewModel.canShowTracks
+                          ? catalog.artists.length
+                          : null,
+                      albumCount: libraryViewModel.canShowTracks
+                          ? catalog.albums.length
+                          : null,
+                      onSectionChanged: (section) =>
+                          setState(() => _section = section),
+                    ),
+                    Expanded(
+                      child: _MainContent(
+                        viewModel: viewModel,
+                        libraryViewModel: libraryViewModel,
+                        section: _section,
+                        searchQuery: _searchQuery,
+                        onPlay: playerViewModel.play,
+                        playingPath: playerViewModel.track?.filePath,
+                        playbackActive: playerViewModel.isPlaying,
+                        onPickFolder: libraryViewModel.chooseAndScanFolder,
+                        browserTarget: _browserTarget,
+                        onOpenInBrowser: _openInBrowser,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _PlayerArea(viewModel: playerViewModel),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -325,6 +359,8 @@ class _MainContent extends StatelessWidget {
     required this.playingPath,
     required this.playbackActive,
     required this.onPickFolder,
+    required this.browserTarget,
+    required this.onOpenInBrowser,
   });
 
   final AppShellViewModel viewModel;
@@ -337,19 +373,26 @@ class _MainContent extends StatelessWidget {
   /// 再生中（一時停止ではない）か。再生中行のイコライザを動かす判定に使う。
   final bool playbackActive;
   final Future<void> Function() onPickFolder;
+  final (String? artist, String? album)? browserTarget;
+  final void Function(String? artist, String? album) onOpenInBrowser;
 
   @override
   Widget build(BuildContext context) {
     if (section != _LibrarySection.library && libraryViewModel.canShowTracks) {
       return Padding(
         padding: const EdgeInsets.all(MuziaSpacing.s6),
-        child: ArtistAlbumBrowser(tracks: libraryViewModel.tracks),
+        child: ArtistAlbumBrowser(
+          // 検索結果から開いたときは初期選択を渡し、対象が変わったら作り直す。
+          key: ValueKey(browserTarget),
+          tracks: libraryViewModel.tracks,
+          initialArtist: browserTarget?.$1,
+          initialAlbum: browserTarget?.$2,
+        ),
       );
     }
-    final visibleTracks = LibrarySearch.filter(
-      libraryViewModel.tracks,
-      searchQuery,
-    );
+    final results = LibrarySearch.search(libraryViewModel.tracks, searchQuery);
+    final visibleTracks = results.tracks;
+    final searching = searchQuery.trim().isNotEmpty;
     final showsLibrary =
         viewModel.status != AppShellStatus.loading &&
         viewModel.status != AppShellStatus.error;
@@ -380,7 +423,7 @@ class _MainContent extends StatelessWidget {
             ),
             // 一覧を表示できる2つの状態は、検索0件の扱いも同じ。
             LibraryStatus.ready || LibraryStatus.readyWithWarnings =>
-              searchQuery.trim().isNotEmpty && visibleTracks.isEmpty
+              searching && results.isEmpty
                   ? const _StatusMessage(
                       icon: Icons.search_off,
                       title: '該当する楽曲がありません',
@@ -388,22 +431,30 @@ class _MainContent extends StatelessWidget {
                     )
                   : null,
           };
+    final table = _TrackTable(
+      tracks: visibleTracks,
+      catalog: LibraryCatalog(libraryViewModel.tracks),
+      highlightQuery: searching ? searchQuery : '',
+      onRemove: libraryViewModel.removeTracks,
+      onEdit: (track, values) =>
+          libraryViewModel.updateTrackMetadata(track, values),
+      onBulkEdit: libraryViewModel.updateTracksMetadata,
+      onPlay: onPlay,
+      playingPath: playingPath,
+      playbackActive: playbackActive,
+    );
     final content = status != null
         ? Padding(
             padding: const EdgeInsets.all(MuziaSpacing.s6),
             child: Center(child: status),
           )
-        : _TrackTable(
-            tracks: visibleTracks,
-            catalog: LibraryCatalog(libraryViewModel.tracks),
-            onRemove: libraryViewModel.removeTracks,
-            onEdit: (track, values) =>
-                libraryViewModel.updateTrackMetadata(track, values),
-            onBulkEdit: libraryViewModel.updateTracksMetadata,
-            onPlay: onPlay,
-            playingPath: playingPath,
-            playbackActive: playbackActive,
-          );
+        : searching
+        ? _SearchResultsView(
+            results: results,
+            table: table,
+            onOpenInBrowser: onOpenInBrowser,
+          )
+        : table;
 
     // 警告は一覧の外に出す。検索0件の空状態でも通知が消えないようにする。
     final warningMessage = libraryViewModel.warningMessage;
@@ -557,6 +608,7 @@ class _TrackTable extends StatefulWidget {
   const _TrackTable({
     required this.tracks,
     required this.catalog,
+    this.highlightQuery = '',
     required this.onRemove,
     required this.onEdit,
     required this.onBulkEdit,
@@ -569,6 +621,9 @@ class _TrackTable extends StatefulWidget {
 
   /// ライブラリ全体。編集ダイアログのジャンル候補やアルバム収録曲の参照に使う。
   final LibraryCatalog catalog;
+
+  /// 検索中の語。行のタイトル/アーティスト/アルバムの一致箇所をハイライトする。
+  final String highlightQuery;
   final Future<bool> Function(List<Track> tracks) onRemove;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
@@ -886,6 +941,7 @@ class _TrackTableState extends State<_TrackTable> {
                     selected: _selectedPaths.contains(track.filePath),
                     playing: widget.playingPath == track.filePath,
                     playbackActive: widget.playbackActive,
+                    highlightQuery: widget.highlightQuery,
                     onPrimaryDown: () => _handlePrimaryDown(index),
                     onSecondaryDown: (position) =>
                         unawaited(_showContextMenu(index, position)),
@@ -1072,6 +1128,7 @@ class _TrackRow extends StatefulWidget {
     required this.selected,
     required this.playing,
     required this.playbackActive,
+    required this.highlightQuery,
     required this.onPrimaryDown,
     required this.onSecondaryDown,
   });
@@ -1081,6 +1138,7 @@ class _TrackRow extends StatefulWidget {
   final bool selected;
   final bool playing;
   final bool playbackActive;
+  final String highlightQuery;
   final VoidCallback onPrimaryDown;
   final ValueChanged<Offset> onSecondaryDown;
 
@@ -1144,21 +1202,21 @@ class _TrackRowState extends State<_TrackRow> {
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-            title: Text(
+            title: _HighlightedText(
               widget.track.title?.isNotEmpty == true
                   ? widget.track.title!
                   : 'タイトル不明',
-              overflow: TextOverflow.ellipsis,
+              query: widget.highlightQuery,
               style: MuziaTextStyles.rowTitle.copyWith(color: titleColor),
             ),
-            artist: Text(
+            artist: _HighlightedText(
               widget.track.artist ?? 'アーティスト不明',
-              overflow: TextOverflow.ellipsis,
+              query: widget.highlightQuery,
               style: MuziaTextStyles.body.copyWith(color: secondaryColor),
             ),
-            album: Text(
+            album: _HighlightedText(
               widget.track.album ?? 'アルバム不明',
-              overflow: TextOverflow.ellipsis,
+              query: widget.highlightQuery,
               style: MuziaTextStyles.body.copyWith(color: secondaryColor),
             ),
             time: Text(
@@ -1188,12 +1246,14 @@ class _TrackRowState extends State<_TrackRow> {
 class _SearchField extends StatefulWidget {
   const _SearchField({
     required this.controller,
+    required this.focusNode,
     required this.query,
     required this.onChanged,
     required this.onClear,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final String query;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
@@ -1203,28 +1263,24 @@ class _SearchField extends StatefulWidget {
 }
 
 class _SearchFieldState extends State<_SearchField> {
-  final _focusNode = FocusNode(debugLabel: 'library-search');
-
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(_onFocusChanged);
+    widget.focusNode.addListener(_onFocusChanged);
   }
 
   void _onFocusChanged() => setState(() {});
 
   @override
   void dispose() {
-    _focusNode
-      ..removeListener(_onFocusChanged)
-      ..dispose();
+    widget.focusNode.removeListener(_onFocusChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<MuziaColors>()!;
-    final focused = _focusNode.hasFocus;
+    final focused = widget.focusNode.hasFocus;
     return Padding(
       padding: const EdgeInsets.only(right: MuziaSpacing.s4),
       child: Container(
@@ -1253,7 +1309,7 @@ class _SearchFieldState extends State<_SearchField> {
               child: TextField(
                 key: const ValueKey('library-search'),
                 controller: widget.controller,
-                focusNode: _focusNode,
+                focusNode: widget.focusNode,
                 onChanged: widget.onChanged,
                 style: MuziaTextStyles.body.copyWith(color: colors.fgPrimary),
                 decoration: InputDecoration(
@@ -1364,6 +1420,217 @@ class _KebabButtonState extends State<_KebabButton> {
         },
         child: Center(child: Icon(Icons.more_vert, size: 16, color: color)),
       ),
+    );
+  }
+}
+
+/// 検索中の一覧（`14-search`）: 件数行 + アルバム / アーティスト / 楽曲のグループ。
+class _SearchResultsView extends StatelessWidget {
+  const _SearchResultsView({
+    required this.results,
+    required this.table,
+    required this.onOpenInBrowser,
+  });
+
+  final SearchResults results;
+  final Widget table;
+  final void Function(String? artist, String? album) onOpenInBrowser;
+
+  /// 見出し付きグループに出す最大件数。楽曲はテーブル側でスクロールする。
+  static const _maxGroupRows = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const ValueKey('search-result-bar'),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: colors.borderSubtle, width: 0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 13, color: colors.fgTertiary),
+              const SizedBox(width: 6),
+              Text(
+                '${formatCount(results.total)} 件の結果: “${results.query}”',
+                style: MuziaTextStyles.secondary.copyWith(
+                  color: colors.fgTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (results.albums.isNotEmpty) ...[
+          const _GroupHeader('アルバム'),
+          for (final album in results.albums.take(_maxGroupRows))
+            _ResultRow(
+              key: ValueKey('search-album-${album.name}'),
+              name: album.name,
+              query: results.query,
+              meta: [
+                ?album.artist,
+                '${formatCount(album.trackCount)}曲',
+              ].join(' · '),
+              icon: Icons.album_outlined,
+              circular: false,
+              onTap: () => onOpenInBrowser(album.artist, album.name),
+            ),
+        ],
+        if (results.artists.isNotEmpty) ...[
+          const _GroupHeader('アーティスト'),
+          for (final artist in results.artists.take(_maxGroupRows))
+            _ResultRow(
+              key: ValueKey('search-artist-${artist.name}'),
+              name: artist.name,
+              query: results.query,
+              meta:
+                  '${formatCount(artist.albumCount)}アルバム · '
+                  '${formatCount(artist.trackCount)}曲',
+              icon: Icons.person_outline,
+              circular: true,
+              onTap: () => onOpenInBrowser(artist.name, null),
+            ),
+        ],
+        if (results.tracks.isNotEmpty) ...[
+          const _GroupHeader('楽曲'),
+          Expanded(child: table),
+        ] else
+          const Spacer(),
+      ],
+    );
+  }
+}
+
+/// グループ見出し（`.group-head`）: 11px bold、fgTertiary。
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 5),
+      child: Text(
+        label,
+        style: MuziaTextStyles.caption.copyWith(
+          fontWeight: FontWeight.w700,
+          color: colors.fgTertiary,
+        ),
+      ),
+    );
+  }
+}
+
+/// アルバム / アーティストの結果行（`.res-album`）。クリックでブラウザの該当箇所を開く。
+class _ResultRow extends StatelessWidget {
+  const _ResultRow({
+    super.key,
+    required this.name,
+    required this.query,
+    required this.meta,
+    required this.icon,
+    required this.circular,
+    required this.onTap,
+  });
+
+  final String name;
+  final String query;
+  final String meta;
+  final IconData icon;
+  final bool circular;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return InkWell(
+      onTap: onTap,
+      hoverColor: colors.rowStripe,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colors.rowHover,
+                shape: circular ? BoxShape.circle : BoxShape.rectangle,
+                borderRadius: circular
+                    ? null
+                    : BorderRadius.circular(MuziaRadius.r2),
+                boxShadow: MuziaShadows.card,
+              ),
+              child: Icon(icon, size: 18, color: colors.fgTertiary),
+            ),
+            const SizedBox(width: MuziaSpacing.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HighlightedText(
+                    name,
+                    query: query,
+                    style: MuziaTextStyles.rowTitle.copyWith(
+                      color: colors.fgPrimary,
+                    ),
+                  ),
+                  Text(
+                    meta,
+                    overflow: TextOverflow.ellipsis,
+                    style: MuziaTextStyles.secondary.copyWith(
+                      color: colors.fgSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 検索語に一致した部分を gold-a4 の背景で強調するテキスト（`mark`）。
+class _HighlightedText extends StatelessWidget {
+  const _HighlightedText(this.text, {required this.query, required this.style});
+
+  final String text;
+  final String query;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final range = LibrarySearch.matchRange(text, query);
+    if (range == null) {
+      return Text(text, overflow: TextOverflow.ellipsis, style: style);
+    }
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          TextSpan(text: text.substring(0, range.start)),
+          TextSpan(
+            text: text.substring(range.start, range.end),
+            style: TextStyle(
+              backgroundColor: colors.highlight,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          TextSpan(text: text.substring(range.end)),
+        ],
+      ),
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

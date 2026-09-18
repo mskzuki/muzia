@@ -271,6 +271,67 @@ void main() {
     expect(find.text('曲を編集'), findsOneWidget);
     expect(find.text('Black or White — Dangerous'), findsNothing);
   });
+  testWidgets('検索中は件数行とグループ見出し、一致箇所のハイライトを表示する', (tester) async {
+    await _pumpApp(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('library-search')),
+      'coast',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('search-result-bar')), findsOneWidget);
+    // Hollow Coast（アーティスト）+ Coastlines（楽曲）= 2件
+    expect(find.text('2 件の結果: “coast”'), findsOneWidget);
+    expect(find.text('楽曲'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('search-artist-Hollow Coast')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('track-row-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('track-row-1')), findsNothing);
+
+    // 一致箇所は gold の背景
+    final title = tester.widget<Text>(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('track-row-0')),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Text && widget.textSpan != null,
+            ),
+          )
+          .first,
+    );
+    final spans = (title.textSpan as TextSpan).children!.cast<TextSpan>();
+    expect(spans[1].text, 'Coast');
+    expect(spans[1].style?.backgroundColor, MuziaColors.light.highlight);
+
+    // アーティストの結果行からブラウザの該当アーティストを開く
+    await tester.tap(find.byKey(const ValueKey('search-artist-Hollow Coast')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('search-result-bar')), findsNothing);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('アーティスト')),
+      findsOneWidget,
+    );
+    expect(find.text('Tidewater'), findsWidgets);
+  });
+
+  testWidgets('⌘F（Ctrl+F）で検索フィールドにフォーカスする', (tester) async {
+    await _pumpApp(tester);
+
+    final field = tester.widget<TextField>(
+      find.byKey(const ValueKey('library-search')),
+    );
+    expect(field.focusNode?.hasFocus, isFalse);
+
+    await tester.sendKeyDownEvent(_editModifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(_editModifier);
+    await tester.pump();
+
+    expect(field.focusNode?.hasFocus, isTrue);
+  });
 }
 
 final bool _isMac = defaultTargetPlatform == TargetPlatform.macOS;

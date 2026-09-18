@@ -4,17 +4,26 @@ import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/track.dart';
 
 class ArtistAlbumBrowser extends StatefulWidget {
-  const ArtistAlbumBrowser({super.key, required this.tracks});
+  const ArtistAlbumBrowser({
+    super.key,
+    required this.tracks,
+    this.initialArtist,
+    this.initialAlbum,
+  });
 
   final List<Track> tracks;
+
+  /// 検索結果などから開く際の初期選択。以降の選択は内部状態で管理する。
+  final String? initialArtist;
+  final String? initialAlbum;
 
   @override
   State<ArtistAlbumBrowser> createState() => _ArtistAlbumBrowserState();
 }
 
 class _ArtistAlbumBrowserState extends State<ArtistAlbumBrowser> {
-  String? _artist;
-  String? _album;
+  late String? _artist = widget.initialArtist;
+  late String? _album = widget.initialAlbum;
 
   @override
   Widget build(BuildContext context) {

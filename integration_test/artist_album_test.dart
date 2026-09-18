@@ -46,15 +46,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Beta'), findsWidgets);
-    final albumCard = find.ancestor(
-      of: find.text('B').first,
-      matching: find.byType(InkWell),
+    // アーティスト選択時点で全楽曲が見える（ウィンドウ高さによってはスクロールが必要）
+    await tester.dragUntilVisible(
+      find.text('One'),
+      find.byType(ListView).last,
+      const Offset(0, -200),
     );
-    await tester.ensureVisible(albumCard);
+    expect(find.text('One'), findsOneWidget);
+    final albumCard = find.byKey(const ValueKey('album-card-B'));
+    await tester.dragUntilVisible(
+      albumCard,
+      find.byType(ListView).last,
+      const Offset(0, 200),
+    );
     await tester.tap(albumCard);
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).last, const Offset(0, -300));
-    await tester.pumpAndSettle();
+    // アルバム詳細のトラックリストにも表示される
+    expect(find.byKey(const ValueKey('album-hero-meta')), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('One'),
+      find.byType(ListView).last,
+      const Offset(0, -200),
+    );
     expect(find.text('One'), findsOneWidget);
   });
 }

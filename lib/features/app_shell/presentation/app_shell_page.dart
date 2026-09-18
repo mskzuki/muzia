@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -12,13 +11,14 @@ import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
 import 'package:muzia/features/library/presentation/bulk_edit_confirm_dialog.dart';
-import 'package:muzia/features/library/presentation/library_removal_dialog.dart';
 import 'package:muzia/features/library/domain/bulk_edit_plan.dart';
 import 'package:muzia/features/library/domain/library_catalog.dart';
 import 'package:muzia/features/library/domain/library_search.dart';
 import 'package:muzia/features/library/domain/metadata_values.dart';
 import 'package:muzia/features/library/domain/track_sort.dart';
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
+import 'package:muzia/features/library/presentation/track_actions.dart';
+import 'package:muzia/shared/widgets/now_playing_equalizer.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
 import 'package:muzia/shared/format/count_format.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
@@ -387,6 +387,13 @@ class _MainContent extends StatelessWidget {
           tracks: libraryViewModel.tracks,
           initialArtist: browserTarget?.$1,
           initialAlbum: browserTarget?.$2,
+          actions: TrackActions(
+            onPlay: onPlay,
+            onEdit: libraryViewModel.updateTrackMetadata,
+            onRemove: libraryViewModel.removeTracks,
+          ),
+          playingPath: playingPath,
+          playbackActive: playbackActive,
         ),
       );
     }
@@ -651,9 +658,6 @@ class _TrackTableState extends State<_TrackTable> {
 
   static bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
 
-  /// コンテキストメニューに表記する「曲を編集…」のショートカット。
-  static String get editShortcutLabel => _isMac ? '⌘I' : 'Ctrl+I';
-
   @override
   void dispose() {
     _focusNode.dispose();
@@ -678,27 +682,20 @@ class _TrackTableState extends State<_TrackTable> {
     setState(() => _sort = _sort?.toggled(field) ?? TrackSort(field));
   }
 
+  TrackActions get _actions => TrackActions(
+    onPlay: widget.onPlay,
+    onEdit: widget.onEdit,
+    onRemove: widget.onRemove,
+  );
+
   Future<void> _confirmRemove(List<Track> targets) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => LibraryRemovalDialog(count: targets.length),
-    );
-    if (confirmed != true || !mounted) return;
-    if (await widget.onRemove(targets) && mounted) {
+    if (await _actions.confirmRemove(context, targets) && mounted) {
       setState(_selectedPaths.clear);
     }
   }
 
-  Future<void> _editTrack(Track track) async {
-    final values = await showDialog<MetadataValues>(
-      context: context,
-      builder: (context) => MetadataEditDialog(
-        track: track,
-        genreSuggestions: widget.catalog.genres,
-      ),
-    );
-    if (values != null) await widget.onEdit(track, values);
-  }
+  Future<void> _editTrack(Track track) =>
+      _actions.editTrack(context, track, widget.catalog);
 
   Future<void> _bulkEdit() async {
     final selected = _selectedTracks;
@@ -774,7 +771,6 @@ class _TrackTableState extends State<_TrackTable> {
   }
 
   Future<void> _showContextMenu(int index, Offset globalPosition) async {
-    final colors = Theme.of(context).extension<MuziaColors>()!;
     final track = _visible[index];
     if (!_selectedPaths.contains(track.filePath)) {
       setState(() {
@@ -784,53 +780,17 @@ class _TrackTableState extends State<_TrackTable> {
         _anchorIndex = index;
       });
     }
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final action = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromRect(
-        globalPosition & const Size(1, 1),
-        Offset.zero & overlay.size,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(MuziaRadius.r3),
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'play',
-          height: 32,
-          child: _MenuLabel(icon: Icons.play_arrow, label: '曲を再生'),
-        ),
-        PopupMenuItem(
-          value: 'edit',
-          height: 32,
-          child: _MenuLabel(
-            icon: Icons.edit_outlined,
-            label: '曲を編集…',
-            shortcut: editShortcutLabel,
-          ),
-        ),
-        PopupMenuItem(
-          value: 'remove',
-          height: 32,
-          child: _MenuLabel(
-            icon: Icons.close,
-            label: 'ライブラリから削除…',
-            color: colors.destructive,
-          ),
-        ),
-      ],
-    );
+    final action = await showTrackContextMenu(context, globalPosition);
     if (!mounted) return;
     switch (action) {
-      case 'play':
+      case TrackMenuAction.play:
         widget.onPlay(track);
-      case 'edit':
+      case TrackMenuAction.edit:
         await _editTrack(track);
-      case 'remove':
+      case TrackMenuAction.remove:
         final selected = _selectedTracks;
         await _confirmRemove(selected.contains(track) ? selected : [track]);
-      case _:
+      case null:
         break;
     }
   }
@@ -1004,82 +964,6 @@ class _SortableHeader extends StatelessWidget {
   }
 }
 
-/// 再生中行の #セルに出す3本バーのイコライザ（`.eq`）。
-///
-/// 再生中だけ 0.9 秒周期で動き、一時停止中と Reduce Motion 時は静止する。
-class _Equalizer extends StatefulWidget {
-  const _Equalizer({required this.color, required this.animating});
-
-  final Color color;
-  final bool animating;
-
-  @override
-  State<_Equalizer> createState() => _EqualizerState();
-}
-
-class _EqualizerState extends State<_Equalizer>
-    with SingleTickerProviderStateMixin {
-  static const _heights = [0.6, 1.0, 0.4];
-  static const _phases = [-0.2 / 0.9, -0.5 / 0.9, 0.0];
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: MuziaMotion.equalizerLoop,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final animate =
-        widget.animating && !MediaQuery.disableAnimationsOf(context);
-    if (animate && !_controller.isAnimating) {
-      _controller.repeat();
-    } else if (!animate && _controller.isAnimating) {
-      _controller.stop();
-    }
-    return Align(
-      alignment: Alignment.centerRight,
-      child: SizedBox(
-        key: const ValueKey('now-playing-equalizer'),
-        height: 11,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) => Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (var i = 0; i < 3; i++) ...[
-                if (i > 0) const SizedBox(width: 1.5),
-                _bar(i, animate),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _bar(int index, bool animate) {
-    // 0% と 100% で scaleY(0.35)、50% で scaleY(1) の ease-in-out。静止時は 0.7。
-    final t = (_controller.value + _phases[index]) % 1;
-    final scale = animate
-        ? 0.35 + 0.65 * (0.5 - 0.5 * math.cos(2 * math.pi * t))
-        : 0.7;
-    return Container(
-      width: 2,
-      height: 11 * _heights[index] * scale,
-      decoration: BoxDecoration(
-        color: widget.color,
-        borderRadius: BorderRadius.circular(1),
-      ),
-    );
-  }
-}
-
 /// テーブルの列構成（ヘッダと行で共有する）。
 class _TrackCells extends StatelessWidget {
   const _TrackCells({
@@ -1190,7 +1074,7 @@ class _TrackRowState extends State<_TrackRow> {
           padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
           child: _TrackCells(
             number: widget.playing
-                ? _Equalizer(
+                ? NowPlayingEqualizer(
                     color: selected ? colors.onAccent : colors.accent,
                     animating: widget.playbackActive,
                   )
@@ -1331,53 +1215,6 @@ class _SearchFieldState extends State<_SearchField> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// コンテキストメニュー項目（`.ctx-item`）: 先頭アイコン15px + ラベル + ショートカット。
-class _MenuLabel extends StatelessWidget {
-  const _MenuLabel({
-    required this.icon,
-    required this.label,
-    this.shortcut,
-    this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? shortcut;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<MuziaColors>()!;
-    return Row(
-      children: [
-        SizedBox(
-          width: 15,
-          child: Icon(icon, size: 14, color: color ?? colors.fgSecondary),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: MuziaTextStyles.body.copyWith(
-              color: color ?? colors.fgPrimary,
-            ),
-          ),
-        ),
-        if (shortcut != null) ...[
-          const SizedBox(width: MuziaSpacing.s4),
-          Text(
-            shortcut!,
-            style: MuziaTextStyles.secondary.copyWith(
-              color: colors.fgTertiary,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

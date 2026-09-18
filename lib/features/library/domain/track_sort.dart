@@ -74,3 +74,13 @@ String formatTrackDuration(int? durationMs) {
       ':${seconds.toString().padLeft(2, '0')}';
   return hours > 0 ? '$hours:$mmss' : mmss;
 }
+
+/// 合計再生時間の表示（`2時間38分` / `44分`）。1分未満は `1分未満`、0は `0分`。
+String formatTotalDuration(int totalMs) {
+  if (totalMs <= 0) return '0分';
+  final totalMinutes = totalMs ~/ 60000;
+  if (totalMinutes == 0) return '1分未満';
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  return hours > 0 ? '$hours時間$minutes分' : '$minutes分';
+}

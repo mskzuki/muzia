@@ -84,6 +84,102 @@ void main() {
     expect(catalog.tracksFor(artist: 'Hidden'), isEmpty);
   });
 
+  test('楽曲はアルバム名 → トラック番号（未設定は末尾）→ タイトルの順に並べる', () {
+    const ordered = [
+      Track(
+        filePath: 'a.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'Second',
+        trackNumber: 1,
+        title: 'S1',
+      ),
+      Track(
+        filePath: 'b.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'First',
+        trackNumber: 2,
+        title: 'F2',
+      ),
+      Track(
+        filePath: 'c.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'First',
+        title: 'F-none',
+      ),
+      Track(
+        filePath: 'd.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'First',
+        trackNumber: 1,
+        title: 'F1',
+      ),
+    ];
+    final catalog = LibraryCatalog(ordered);
+    expect(catalog.tracksFor(artist: 'X').map((track) => track.title), [
+      'F1',
+      'F2',
+      'F-none',
+      'S1',
+    ]);
+  });
+
+  test('アーティスト / アルバムの集計（件数・代表ジャンル・合計時間・年）', () {
+    const summarized = [
+      Track(
+        filePath: 'a.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'A',
+        genre: 'Rock',
+        durationMs: 60000,
+        releaseYear: 2020,
+      ),
+      Track(
+        filePath: 'b.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'A',
+        genre: 'Rock',
+        durationMs: 90000,
+        releaseYear: 2020,
+      ),
+      Track(
+        filePath: 'c.mp3',
+        fileExtension: '.mp3',
+        artist: 'X',
+        album: 'B',
+        genre: 'Jazz',
+        durationMs: null,
+        releaseYear: 2021,
+      ),
+      Track(
+        filePath: 'd.mp3',
+        fileExtension: '.mp3',
+        artist: 'Y',
+        album: 'A',
+        genre: 'Pop',
+      ),
+    ];
+    final catalog = LibraryCatalog(summarized);
+    final artist = catalog.artistSummary('X');
+    expect(artist.albumCount, 2);
+    expect(artist.trackCount, 3);
+    expect(artist.genre, 'Rock');
+    expect(artist.totalDurationMs, 150000);
+
+    final album = catalog.albumSummary('A', artist: 'X');
+    expect(album.trackCount, 2);
+    expect(album.releaseYear, 2020);
+    expect(album.totalDurationMs, 150000);
+    // アーティスト未指定なら収録曲の最多アーティスト
+    expect(catalog.albumSummary('A').artist, 'X');
+    expect(catalog.albumSummary('A').trackCount, 3);
+  });
+
   testWidgets('アーティスト、アルバム、楽曲を順に表示する', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -96,9 +192,15 @@ void main() {
     expect(find.text('Alpha'), findsWidgets);
     await tester.tap(find.text('Beta'));
     await tester.pump();
-    expect(find.text('B'), findsWidgets);
-    await tester.tap(find.text('B').first);
-    await tester.pump();
+    // アーティスト選択時点で楽曲セクション（全楽曲）が出る
     expect(find.text('One'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('album-card-B')));
+    await tester.pump();
+    // アルバム詳細: ヒーロー + トラックリスト
+    expect(find.byKey(const ValueKey('album-hero-meta')), findsOneWidget);
+    expect(find.text('One'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('album-back')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('artist-hero-meta')), findsOneWidget);
   });
 }

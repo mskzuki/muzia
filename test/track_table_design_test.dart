@@ -7,6 +7,7 @@ import 'package:muzia/app/app.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
+import 'package:muzia/features/library/presentation/track_actions.dart';
 import 'package:muzia/features/playback/domain/audio_player_service.dart';
 import 'package:muzia/features/playback/presentation/player_view_model.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
@@ -154,7 +155,7 @@ void main() {
     expect(find.text('ライブラリから削除…'), findsOneWidget);
     // 各項目の先頭アイコン（プレイヤーバーの再生アイコンと区別するためメニュー内に限定）
     Finder menuIcon(IconData icon) => find.descendant(
-      of: find.byType(PopupMenuItem<String>),
+      of: find.byType(PopupMenuItem<TrackMenuAction>),
       matching: find.byIcon(icon),
     );
     expect(menuIcon(Icons.play_arrow), findsOneWidget);

@@ -104,7 +104,8 @@ class LibraryViewModel extends ChangeNotifier {
       _status == LibraryStatus.readyWithWarnings;
 
   Future<void> initialize() async {
-    if (_initialized) return;
+    // 読み込みに失敗した後は、エラーアラートの「再試行」から再実行できる。
+    if (_initialized && _status != LibraryStatus.error) return;
     _initialized = true;
     _status = LibraryStatus.loading;
     _clearWarning();

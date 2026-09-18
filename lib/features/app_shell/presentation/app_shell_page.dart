@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:muzia/app/providers.dart';
+import 'dart:io' show exit;
+
 import 'package:muzia/features/app_shell/presentation/app_shell_view_model.dart';
+import 'package:muzia/features/app_shell/presentation/data_error_alert.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/artist_album_browser.dart';
@@ -198,6 +201,8 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
                         onPickFolder: libraryViewModel.chooseAndScanFolder,
                         browserTarget: _browserTarget,
                         onOpenInBrowser: _openInBrowser,
+                        onRetry: () => unawaited(viewModel.initialize()),
+                        onQuit: () => exit(0),
                       ),
                     ),
                   ],
@@ -379,6 +384,8 @@ class _MainContent extends StatelessWidget {
     required this.onPickFolder,
     required this.browserTarget,
     required this.onOpenInBrowser,
+    required this.onRetry,
+    required this.onQuit,
   });
 
   final AppShellViewModel viewModel;
@@ -393,6 +400,8 @@ class _MainContent extends StatelessWidget {
   final Future<void> Function() onPickFolder;
   final (String? artist, String? album)? browserTarget;
   final void Function(String? artist, String? album) onOpenInBrowser;
+  final VoidCallback onRetry;
+  final VoidCallback onQuit;
 
   @override
   Widget build(BuildContext context) {
@@ -429,11 +438,8 @@ class _MainContent extends StatelessWidget {
             message: '準備が完了するまでお待ちください。',
           )
         : viewModel.status == AppShellStatus.error
-        ? _StatusMessage(
-            icon: Icons.error_outline,
-            title: '読み込みエラー',
-            message: viewModel.errorMessage ?? 'ライブラリを読み込めませんでした。',
-          )
+        // 致命的エラーはアラート（下記）で表示する。背後には最後の一覧を残す。
+        ? null
         : switch (libraryViewModel.status) {
             LibraryStatus.loading => const _StatusMessage(
               icon: Icons.hourglass_top,
@@ -441,11 +447,7 @@ class _MainContent extends StatelessWidget {
               message: '準備が完了するまでお待ちください。',
             ),
             LibraryStatus.empty => _EmptyLibrary(onPickFolder: onPickFolder),
-            LibraryStatus.error => _StatusMessage(
-              icon: Icons.error_outline,
-              title: '読み込みエラー',
-              message: libraryViewModel.errorMessage ?? 'ライブラリを読み込めませんでした。',
-            ),
+            LibraryStatus.error => null,
             // 一覧を表示できる2つの状態は、検索0件の扱いも同じ。
             LibraryStatus.ready || LibraryStatus.readyWithWarnings =>
               searching && results.isEmpty
@@ -468,7 +470,12 @@ class _MainContent extends StatelessWidget {
       playingPath: playingPath,
       playbackActive: playbackActive,
     );
-    final content = status != null
+    final fatalError = viewModel.status == AppShellStatus.error
+        ? viewModel.errorMessage ?? 'ライブラリを読み込めませんでした。'
+        : libraryViewModel.status == LibraryStatus.error
+        ? libraryViewModel.errorMessage ?? 'ライブラリを読み込めませんでした。'
+        : null;
+    final body = status != null
         ? Padding(
             padding: const EdgeInsets.all(MuziaSpacing.s6),
             child: Center(child: status),
@@ -480,6 +487,29 @@ class _MainContent extends StatelessWidget {
             onOpenInBrowser: onOpenInBrowser,
           )
         : table;
+    final content = fatalError == null
+        ? body
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              // 最後に読み込めた一覧を淡く残し、操作は受け付けない（12-error）。
+              IgnorePointer(
+                child: Opacity(
+                  opacity: 0.6,
+                  child: libraryViewModel.tracks.isEmpty
+                      ? const SizedBox.expand()
+                      : body,
+                ),
+              ),
+              DataErrorAlert(
+                message:
+                    '$fatalError 音楽ファイルは変更されていません。'
+                    '解決しない場合は、フォルダを登録し直してください。',
+                onRetry: onRetry,
+                onQuit: onQuit,
+              ),
+            ],
+          );
 
     // 警告は一覧の外に出す。検索0件の空状態でも通知が消えないようにする。
     final warningMessage = libraryViewModel.warningMessage;

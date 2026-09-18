@@ -45,8 +45,12 @@ void main() {
     await tester.pumpWidget(MuziaApp(viewModel: viewModel));
     await tester.pumpAndSettle();
 
-    expect(find.text('読み込みエラー'), findsOneWidget);
-    expect(find.text('ライブラリの読み込みに失敗しました。'), findsOneWidget);
+    // 致命的エラーはスクリム付きのアラートで表示する（12-error）
+    expect(find.byKey(const ValueKey('data-error-alert')), findsOneWidget);
+    expect(find.text('ライブラリを開けません'), findsOneWidget);
+    expect(find.textContaining('ライブラリの読み込みに失敗しました。'), findsOneWidget);
+    expect(find.text('再試行'), findsOneWidget);
+    expect(find.text('終了'), findsOneWidget);
   });
 
   testWidgets('検索語を入力してクリアできる', (tester) async {

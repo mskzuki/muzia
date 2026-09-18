@@ -351,8 +351,7 @@ class _ArtistDetail extends StatelessWidget {
                 _PlayButton(
                   key: const ValueKey('artist-play'),
                   enabled: songs.isNotEmpty,
-                  // 連続再生（2609021649）までは先頭の1曲を再生する。
-                  onPressed: () => actions.onPlay(songs.first),
+                  onPressed: () => actions.onPlay(songs.first, queue: songs),
                 ),
               ],
             ),
@@ -399,6 +398,7 @@ class _ArtistDetail extends StatelessWidget {
                     key: ValueKey('artist-song-$index'),
                     index: index,
                     track: track,
+                    queue: songs,
                     playing: playingPath == track.filePath,
                     playbackActive: playbackActive,
                     actions: actions,
@@ -528,7 +528,7 @@ class _AlbumDetail extends StatelessWidget {
                 _PlayButton(
                   key: const ValueKey('album-play'),
                   enabled: tracks.isNotEmpty,
-                  onPressed: () => actions.onPlay(tracks.first),
+                  onPressed: () => actions.onPlay(tracks.first, queue: tracks),
                 ),
               ],
             ),
@@ -574,6 +574,7 @@ class _AlbumDetail extends StatelessWidget {
                   key: ValueKey('album-track-$index'),
                   index: index,
                   track: track,
+                  queue: tracks,
                   playing: playingPath == track.filePath,
                   playbackActive: playbackActive,
                   actions: actions,
@@ -668,6 +669,7 @@ class _TopSongRow extends StatelessWidget {
     super.key,
     required this.index,
     required this.track,
+    required this.queue,
     required this.playing,
     required this.playbackActive,
     required this.actions,
@@ -676,6 +678,7 @@ class _TopSongRow extends StatelessWidget {
 
   final int index;
   final Track track;
+  final List<Track> queue;
   final bool playing;
   final bool playbackActive;
   final TrackActions actions;
@@ -687,6 +690,7 @@ class _TopSongRow extends StatelessWidget {
     final titleColor = playing ? colors.accentText : colors.fgPrimary;
     return _InteractiveRow(
       track: track,
+      queue: queue,
       actions: actions,
       catalog: catalog,
       height: 40,
@@ -756,6 +760,7 @@ class _AlbumTrackRow extends StatelessWidget {
     super.key,
     required this.index,
     required this.track,
+    required this.queue,
     required this.playing,
     required this.playbackActive,
     required this.actions,
@@ -764,6 +769,7 @@ class _AlbumTrackRow extends StatelessWidget {
 
   final int index;
   final Track track;
+  final List<Track> queue;
   final bool playing;
   final bool playbackActive;
   final TrackActions actions;
@@ -775,6 +781,7 @@ class _AlbumTrackRow extends StatelessWidget {
     final fg = playing ? colors.accentText : null;
     return _InteractiveRow(
       track: track,
+      queue: queue,
       actions: actions,
       catalog: catalog,
       height: 40,
@@ -835,6 +842,7 @@ class _AlbumTrackRow extends StatelessWidget {
 class _InteractiveRow extends StatefulWidget {
   const _InteractiveRow({
     required this.track,
+    required this.queue,
     required this.actions,
     required this.catalog,
     required this.height,
@@ -846,6 +854,9 @@ class _InteractiveRow extends StatefulWidget {
   });
 
   final Track track;
+
+  /// 行が属する一覧。再生時の暗黙のキューになる。
+  final List<Track> queue;
   final TrackActions actions;
   final LibraryCatalog catalog;
   final double height;
@@ -867,7 +878,7 @@ class _InteractiveRowState extends State<_InteractiveRow> {
     if (!mounted) return;
     switch (action) {
       case TrackMenuAction.play:
-        widget.actions.onPlay(widget.track);
+        widget.actions.onPlay(widget.track, queue: widget.queue);
       case TrackMenuAction.edit:
         await widget.actions.editTrack(context, widget.track, widget.catalog);
       case TrackMenuAction.remove:
@@ -891,7 +902,8 @@ class _InteractiveRowState extends State<_InteractiveRow> {
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onDoubleTap: () => widget.actions.onPlay(widget.track),
+          onDoubleTap: () =>
+              widget.actions.onPlay(widget.track, queue: widget.queue),
           child: Container(
             height: widget.height,
             padding: widget.padding,

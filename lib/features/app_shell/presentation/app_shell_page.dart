@@ -47,7 +47,7 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
   static bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
 
   /// ファイルが見つからない楽曲は再生を試みず、理由を表示する（FR-009）。
-  void _play(Track track) {
+  void _play(Track track, {required List<Track> queue}) {
     if (!track.isAvailable) {
       final name = track.title?.isNotEmpty == true
           ? track.title!
@@ -57,7 +57,7 @@ class _AppShellPageState extends ConsumerState<AppShellPage> {
       );
       return;
     }
-    unawaited(ref.read(playerViewModelProvider).play(track));
+    unawaited(ref.read(playerViewModelProvider).play(track, queue: queue));
   }
 
   void _openInBrowser(String? artist, String? album) {
@@ -392,7 +392,7 @@ class _MainContent extends StatelessWidget {
   final LibraryViewModel libraryViewModel;
   final _LibrarySection section;
   final String searchQuery;
-  final ValueChanged<Track> onPlay;
+  final PlayTrack onPlay;
   final String? playingPath;
 
   /// 再生中（一時停止ではない）か。再生中行のイコライザを動かす判定に使う。
@@ -742,7 +742,7 @@ class _TrackTable extends StatefulWidget {
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks, MetadataValues values)
   onBulkEdit;
-  final ValueChanged<Track> onPlay;
+  final PlayTrack onPlay;
   final String? playingPath;
   final bool playbackActive;
 
@@ -848,7 +848,7 @@ class _TrackTableState extends State<_TrackTable> {
     _lastTapIndex = index;
     _lastTapTime = now;
     if (isDoubleClick) {
-      widget.onPlay(track);
+      widget.onPlay(track, queue: _visible);
       return;
     }
     final keyboard = HardwareKeyboard.instance;
@@ -891,7 +891,7 @@ class _TrackTableState extends State<_TrackTable> {
     if (!mounted) return;
     switch (action) {
       case TrackMenuAction.play:
-        widget.onPlay(track);
+        widget.onPlay(track, queue: _visible);
       case TrackMenuAction.edit:
         await _editTrack(track);
       case TrackMenuAction.remove:
@@ -1632,6 +1632,7 @@ class _HighlightedText extends StatelessWidget {
   }
 }
 
+/// フッターのプレイヤーバー（`.player`）: 左右 290px、中央は max 540px の可変幅。
 class _PlayerArea extends StatelessWidget {
   const _PlayerArea({required this.viewModel});
 
@@ -1648,158 +1649,40 @@ class _PlayerArea extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: MuziaSpacing.s4),
       decoration: BoxDecoration(
         color: colors.sidebarBg,
-        border: Border(top: BorderSide(color: colors.borderSubtle)),
+        border: Border(top: BorderSide(color: colors.borderSubtle, width: 0.5)),
       ),
       child: Row(
         children: [
-          // 左: 現在の曲情報
-          SizedBox(
-            width: 240,
-            child: track == null
-                ? Text(
-                    '再生する楽曲が選択されていません',
-                    style: MuziaTextStyles.secondary.copyWith(
-                      color: colors.fgTertiary,
-                    ),
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: colors.rowHover,
-                          borderRadius: BorderRadius.circular(MuziaRadius.r2),
-                          border: Border.all(color: colors.borderSubtle),
-                        ),
-                        child: Icon(
-                          Icons.music_note,
-                          size: 18,
-                          color: colors.fgTertiary,
-                        ),
-                      ),
-                      const SizedBox(width: MuziaSpacing.s3),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              track.title ?? 'タイトル不明',
-                              overflow: TextOverflow.ellipsis,
-                              style: MuziaTextStyles.rowTitle.copyWith(
-                                color: colors.fgPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              [
-                                track.artist ?? 'アーティスト不明',
-                                ?track.album,
-                              ].join(' — '),
-                              overflow: TextOverflow.ellipsis,
-                              style: MuziaTextStyles.secondary.copyWith(
-                                color: colors.fgSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-          // 中央: transportとシークバー
+          // 左: 現在の曲情報（`.pl-now`）
+          SizedBox(width: 290, child: _NowPlaying(track: track)),
+          const SizedBox(width: 18),
+          // 中央: transportとシークバー（`.pl-center`）
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 540),
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // TODO(playback): 前後スキップ・シークは再生キュー未実装のため
-                    // 無効化している。対応時に別課題で有効化する。
-                    IconButton(
-                      key: const ValueKey('playback-previous'),
-                      tooltip: '前の曲（未対応）',
-                      onPressed: null,
-                      iconSize: 18,
-                      disabledColor: colors.fgTertiary,
-                      icon: const Icon(Icons.skip_previous),
-                    ),
-                    const SizedBox(width: MuziaSpacing.s1),
-                    if (viewModel.status == PlaybackStatus.loading)
-                      const SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: Padding(
-                          padding: EdgeInsets.all(7),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else
-                      SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: IconButton.filled(
-                          key: const ValueKey('playback-toggle'),
-                          tooltip: viewModel.isPlaying ? '一時停止' : '再生',
-                          onPressed: track == null
-                              ? null
-                              : viewModel.togglePause,
-                          iconSize: 18,
-                          padding: EdgeInsets.zero,
-                          style: IconButton.styleFrom(
-                            backgroundColor: colors.fgPrimary,
-                            foregroundColor: colors.windowBg,
-                            disabledBackgroundColor: colors.rowHover,
-                          ),
-                          icon: Icon(
-                            viewModel.isPlaying
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: MuziaSpacing.s1),
-                    IconButton(
-                      key: const ValueKey('playback-next'),
-                      tooltip: '次の曲（未対応）',
-                      onPressed: null,
-                      iconSize: 18,
-                      disabledColor: colors.fgTertiary,
-                      icon: const Icon(Icons.skip_next),
+                    _TransportControls(viewModel: viewModel),
+                    const SizedBox(height: 6),
+                    _Scrubber(
+                      position: viewModel.position,
+                      duration: viewModel.duration,
+                      enabled:
+                          track != null &&
+                          viewModel.status != PlaybackStatus.error,
+                      onSeek: viewModel.seek,
                     ),
                   ],
                 ),
-                SizedBox(
-                  width: 420,
-                  height: 14,
-                  child: SliderTheme(
-                    data: SliderThemeData(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 5,
-                        disabledThumbRadius: 5,
-                      ),
-                      overlayShape: SliderComponentShape.noOverlay,
-                      disabledActiveTrackColor: colors.accent,
-                      disabledInactiveTrackColor: colors.borderSubtle,
-                      disabledThumbColor: colors.windowBg,
-                    ),
-                    child: const Slider(
-                      key: ValueKey('playback-seek'),
-                      // TODO(playback): 再生位置の取得・シーク未対応のため無効。
-                      value: 0,
-                      onChanged: null,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-          // 右: エラー表示と音量（音量は未対応のため無効）
+          const SizedBox(width: 18),
+          // 右: エラー表示と音量（`.pl-right`）。品質バッジ・キュー・AirPlayはMVP後。
           SizedBox(
-            width: 240,
+            width: 290,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -1814,15 +1697,334 @@ class _PlayerArea extends StatelessWidget {
                       ),
                     ),
                   ),
-                const SizedBox(width: MuziaSpacing.s2),
-                IconButton(
-                  tooltip: '音量（未対応）',
-                  onPressed: null,
-                  iconSize: 18,
-                  disabledColor: colors.fgTertiary,
-                  icon: const Icon(Icons.volume_up),
+                const SizedBox(width: 14),
+                _VolumeControl(
+                  volume: viewModel.volume,
+                  onChanged: (value) =>
+                      unawaited(viewModel.setVolume(value, persist: false)),
+                  onChangeEnd: (value) => unawaited(viewModel.setVolume(value)),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NowPlaying extends StatelessWidget {
+  const _NowPlaying({required this.track});
+
+  final Track? track;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final track = this.track;
+    if (track == null) {
+      return Text(
+        '再生する楽曲が選択されていません',
+        style: MuziaTextStyles.secondary.copyWith(color: colors.fgTertiary),
+      );
+    }
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colors.rowHover,
+            borderRadius: BorderRadius.circular(MuziaRadius.r2),
+            border: Border.all(color: colors.borderSubtle),
+          ),
+          child: Icon(Icons.music_note, size: 18, color: colors.fgTertiary),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                track.title ?? 'タイトル不明',
+                overflow: TextOverflow.ellipsis,
+                style: MuziaTextStyles.rowTitle.copyWith(
+                  color: colors.fgPrimary,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                [track.artist ?? 'アーティスト不明', ?track.album].join(' — '),
+                overflow: TextOverflow.ellipsis,
+                style: MuziaTextStyles.secondary.copyWith(
+                  color: colors.fgSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 前の曲 / 再生・一時停止 / 次の曲（`.pl-ctrls`、gap 18）。
+/// シャッフル・リピートはMVP範囲外のため置かない。
+class _TransportControls extends StatelessWidget {
+  const _TransportControls({required this.viewModel});
+
+  final PlayerViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final track = viewModel.track;
+    final loading = viewModel.status == PlaybackStatus.loading;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _SkipButton(
+          buttonKey: const ValueKey('playback-previous'),
+          tooltip: '前の曲',
+          icon: Icons.skip_previous,
+          onPressed: viewModel.canSkipPrevious
+              ? () => unawaited(viewModel.previous())
+              : null,
+        ),
+        const SizedBox(width: 18),
+        SizedBox(
+          width: 34,
+          height: 34,
+          child: loading
+              ? const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : IconButton.filled(
+                  key: const ValueKey('playback-toggle'),
+                  tooltip: viewModel.isPlaying ? '一時停止' : '再生',
+                  onPressed: track == null
+                      ? null
+                      : () => unawaited(viewModel.togglePause()),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  style: IconButton.styleFrom(
+                    backgroundColor: colors.fgPrimary,
+                    foregroundColor: colors.windowBg,
+                    disabledBackgroundColor: colors.rowHover,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: Icon(
+                    viewModel.isPlaying ? Icons.pause : Icons.play_arrow,
+                  ),
+                ),
+        ),
+        const SizedBox(width: 18),
+        _SkipButton(
+          buttonKey: const ValueKey('playback-next'),
+          tooltip: '次の曲',
+          icon: Icons.skip_next,
+          onPressed: viewModel.canSkipNext
+              ? () => unawaited(viewModel.next())
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _SkipButton extends StatelessWidget {
+  const _SkipButton({
+    required this.buttonKey,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  /// テスト・Integration Test から IconButton を特定するためのキー。
+  final Key buttonKey;
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return IconButton(
+      key: buttonKey,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      iconSize: 19,
+      // Material 3 では constraints ではなく style で寸法を決める。
+      style: IconButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(28, 28),
+        fixedSize: const Size(28, 28),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: colors.fgSecondary,
+        disabledForegroundColor: colors.fgTertiary,
+      ),
+      icon: Icon(icon),
+    );
+  }
+}
+
+/// 4px トラック・白11pxノブのスライダー様式（`.track` / `.knob`）。
+SliderThemeData _trackSliderTheme(MuziaColors colors) => SliderThemeData(
+  trackHeight: 4,
+  trackShape: const RectangularSliderTrackShape(),
+  thumbShape: const RoundSliderThumbShape(
+    enabledThumbRadius: 5.5,
+    disabledThumbRadius: 5.5,
+    elevation: 1,
+    pressedElevation: 1,
+  ),
+  overlayShape: SliderComponentShape.noOverlay,
+  activeTrackColor: colors.accent,
+  inactiveTrackColor: colors.sliderTrack,
+  thumbColor: Colors.white,
+  disabledActiveTrackColor: colors.accent,
+  disabledInactiveTrackColor: colors.sliderTrack,
+  disabledThumbColor: Colors.white,
+);
+
+/// シークバー（`.pl-scrub`）: 経過時間・トラック・総時間。値は秒。
+/// ドラッグ中は再生位置の更新に引きずられないよう、ローカルの値を表示する。
+class _Scrubber extends StatefulWidget {
+  const _Scrubber({
+    required this.position,
+    required this.duration,
+    required this.enabled,
+    required this.onSeek,
+  });
+
+  final Duration position;
+  final Duration duration;
+  final bool enabled;
+  final Future<void> Function(Duration position) onSeek;
+
+  @override
+  State<_Scrubber> createState() => _ScrubberState();
+}
+
+class _ScrubberState extends State<_Scrubber> {
+  double? _dragSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    final totalSeconds = widget.duration.inMilliseconds / 1000;
+    final canSeek = widget.enabled && totalSeconds > 0;
+    final shownSeconds =
+        _dragSeconds ??
+        (widget.position.inMilliseconds / 1000).clamp(
+          0.0,
+          totalSeconds > 0 ? totalSeconds : 0.0,
+        );
+    final timeStyle = MuziaTextStyles.caption.copyWith(
+      color: colors.fgTertiary,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Row(
+      children: [
+        SizedBox(
+          width: 34,
+          child: Text(
+            formatTrackDuration((shownSeconds * 1000).round()),
+            key: const ValueKey('playback-position'),
+            textAlign: TextAlign.right,
+            style: timeStyle,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: SizedBox(
+            height: 14,
+            child: SliderTheme(
+              data: _trackSliderTheme(colors),
+              child: Slider(
+                key: const ValueKey('playback-seek'),
+                value: shownSeconds,
+                max: totalSeconds > 0 ? totalSeconds : 1,
+                onChangeStart: canSeek
+                    ? (value) => setState(() => _dragSeconds = value)
+                    : null,
+                onChanged: canSeek
+                    ? (value) => setState(() => _dragSeconds = value)
+                    : null,
+                onChangeEnd: canSeek
+                    ? (value) {
+                        setState(() => _dragSeconds = null);
+                        unawaited(
+                          widget.onSeek(
+                            Duration(milliseconds: (value * 1000).round()),
+                          ),
+                        );
+                      }
+                    : null,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 9),
+        SizedBox(
+          width: 34,
+          child: Text(
+            formatTrackDuration(widget.duration.inMilliseconds),
+            key: const ValueKey('playback-duration'),
+            style: timeStyle,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 音量（`.pl-vol`）: アイコン16px + 110px トラック。
+class _VolumeControl extends StatelessWidget {
+  const _VolumeControl({
+    required this.volume,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
+
+  final double volume;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MuziaColors>()!;
+    return SizedBox(
+      width: 110,
+      child: Row(
+        children: [
+          Tooltip(
+            message: '音量',
+            child: Icon(
+              volume == 0
+                  ? Icons.volume_off
+                  : volume < 0.5
+                  ? Icons.volume_down
+                  : Icons.volume_up,
+              size: 16,
+              color: colors.fgTertiary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 14,
+              child: SliderTheme(
+                data: _trackSliderTheme(colors),
+                child: Slider(
+                  key: const ValueKey('playback-volume'),
+                  value: volume.clamp(0.0, 1.0),
+                  onChanged: onChanged,
+                  onChangeEnd: onChangeEnd,
+                ),
+              ),
             ),
           ),
         ],

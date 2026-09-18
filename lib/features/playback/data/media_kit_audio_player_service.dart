@@ -27,5 +27,24 @@ class MediaKitAudioPlayerService implements AudioPlayerService {
   Future<void> resume() => _player.play();
 
   @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  /// media_kit の音量は 0〜100。
+  @override
+  Future<void> setVolume(double volume) =>
+      _player.setVolume((volume.clamp(0.0, 1.0) * 100).toDouble());
+
+  @override
+  Stream<Duration> get positionStream => _player.stream.position;
+
+  @override
+  Stream<Duration> get durationStream => _player.stream.duration;
+
+  /// `completed` は再生開始時に false も流れるため、true のみを通知する。
+  @override
+  Stream<void> get completedStream =>
+      _player.stream.completed.where((completed) => completed);
+
+  @override
   Future<void> dispose() => _player.dispose();
 }

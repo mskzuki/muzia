@@ -7,6 +7,10 @@ import 'package:muzia/features/library/presentation/library_removal_dialog.dart'
 import 'package:muzia/features/library/presentation/metadata_edit_dialog.dart';
 import 'package:muzia/shared/theme/muzia_theme.dart';
 
+/// 楽曲を再生する。[queue] は再生開始時点で表示している一覧（検索・ソート適用後）で、
+/// 前後スキップと自動次曲送りの暗黙のキューになる。
+typedef PlayTrack = void Function(Track track, {required List<Track> queue});
+
 /// 楽曲行に対する操作。楽曲一覧テーブルとアーティスト/アルバムブラウザで共有する。
 class TrackActions {
   const TrackActions({
@@ -17,12 +21,12 @@ class TrackActions {
 
   /// 何もしない既定値（操作を持たない画面・テスト用）。
   static final none = TrackActions(
-    onPlay: (_) {},
+    onPlay: (_, {required queue}) {},
     onEdit: (_, _) async => false,
     onRemove: (_) async => false,
   );
 
-  final ValueChanged<Track> onPlay;
+  final PlayTrack onPlay;
   final Future<bool> Function(Track track, MetadataValues values) onEdit;
   final Future<bool> Function(List<Track> tracks) onRemove;
 

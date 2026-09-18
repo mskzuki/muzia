@@ -5,6 +5,8 @@ import 'package:muzia/app/app.dart';
 import 'package:muzia/features/library/data/music_repository.dart';
 import 'package:muzia/features/library/domain/track.dart';
 import 'package:muzia/features/library/presentation/library_view_model.dart';
+import 'package:muzia/features/playback/domain/audio_player_service.dart';
+import 'package:muzia/features/playback/presentation/player_view_model.dart';
 
 const _tracks = [
   Track(
@@ -62,5 +64,12 @@ Future<void> main() async {
   await repository.registerFolder('/tmp/music', _tracks);
   final library = LibraryViewModel(repository: repository);
   await library.initialize();
-  runMuziaApp(libraryViewModel: library);
+  // プレイヤーバーの再生中状態（01-songs のフッター）を確認できるよう、
+  // 実音声なしで先頭曲を再生中にし、位置と総時間を流しておく。
+  final service = FakeAudioPlayerService();
+  final player = PlayerViewModel(service: service);
+  await player.play(_tracks.first, queue: _tracks);
+  service.emitDuration(const Duration(minutes: 3, seconds: 58));
+  service.emitPosition(const Duration(minutes: 1, seconds: 42));
+  runMuziaApp(libraryViewModel: library, playerViewModel: player);
 }

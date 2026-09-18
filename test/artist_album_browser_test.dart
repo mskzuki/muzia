@@ -95,10 +95,14 @@ void main() {
 
   testWidgets('アーティストヒーローはアーティスト全体のメタ行と再生ボタンを持つ', (tester) async {
     Track? played;
+    List<Track>? playedQueue;
     await _pump(
       tester,
       actions: TrackActions(
-        onPlay: (track) => played = track,
+        onPlay: (track, {required queue}) {
+          played = track;
+          playedQueue = queue;
+        },
         onEdit: (_, _) async => true,
         onRemove: (_) async => true,
       ),
@@ -126,6 +130,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('artist-play')));
     expect(played?.filePath, '/a/1.mp3');
+    // 連続再生: アーティストの楽曲一覧（表示順）がキューになる
+    expect(playedQueue?.map((t) => t.filePath), [
+      '/a/1.mp3',
+      '/a/2.mp3',
+      '/b/1.mp3',
+    ]);
   });
 
   testWidgets('アルバムカードでアルバム詳細を開き、#はトラック番号で表示する', (tester) async {
@@ -168,7 +178,7 @@ void main() {
     await _pump(
       tester,
       actions: TrackActions(
-        onPlay: (track) => played = track,
+        onPlay: (track, {required queue}) => played = track,
         onEdit: (_, _) async => true,
         onRemove: (tracks) async {
           removed = tracks;

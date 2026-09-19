@@ -4,6 +4,7 @@
 
 - 種別: 既存実装の是正（UIデザイン適合）
 - 作成日: 2026-09-02
+- 状態: 見送り（2026-09-18、ドラッグ&ドロップはMVP範囲外と決定。MVP後に再検討）
 - 参照: [docs/design_handoff/README.md](../../design_handoff/README.md) §8
   「Interactions & Behavior — Drag & drop」、`screenshots/08-empty.png`
 
